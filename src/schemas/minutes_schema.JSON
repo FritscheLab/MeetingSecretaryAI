@@ -1,0 +1,172 @@
+{
+  "type": "object",
+  "properties": {
+    "meeting_details": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "date": { "type": "string", "description": "Date of the meeting in YYYYMMDD format" },
+        "time": { "type": "string", "description": "Time of the meeting in 12-hour format (e.g., '1:00 PM')" },
+        "location": { "type": "string" },
+        "attendees": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "first_name": { "type": "string" },
+              "last_name": { "type": "string" },
+              "role": { "type": "string" }
+            },
+            "required": ["first_name", "last_name", "role"],
+            "additionalProperties": false
+          }
+        },
+        "absentees": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "first_name": { "type": "string" },
+              "last_name": { "type": "string" },
+              "role": { "type": "string" }
+            },
+            "required": ["first_name", "last_name", "role"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["title", "date", "time", "location", "attendees", "absentees"],
+      "additionalProperties": false
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "discussion_points": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "decisions": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "action_items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "task": { "type": "string" },
+                "responsible": { "type": "string" }
+              },
+              "required": ["task", "responsible"],
+              "additionalProperties": false
+            }
+          },
+          "key_recommendations": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "rationale": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "reference_titles": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "subsections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": { "type": "string" },
+                "discussion_points": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "decisions": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "action_items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "task": { "type": "string" },
+                      "responsible": { "type": "string" }
+                    },
+                    "required": ["task", "responsible"],
+                    "additionalProperties": false
+                  }
+                },
+                "key_recommendations": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "rationale": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "reference_titles": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              },
+              "required": [
+                "title",
+                "discussion_points",
+                "decisions",
+                "action_items",
+                "key_recommendations",
+                "rationale",
+                "reference_titles"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "title",
+          "discussion_points",
+          "decisions",
+          "action_items",
+          "key_recommendations",
+          "rationale",
+          "reference_titles",
+          "subsections"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "reflection": {
+      "type": "string"
+    },
+    "references": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "reference_type": {
+            "type": "string",
+            "enum": ["document", "appendix", "URL", "book", "webpage", "publication", "other"]
+          },
+          "identifier": { "type": "string" },
+          "description": { "type": "string" }
+        },
+        "required": ["title", "reference_type", "identifier", "description"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "meeting_details",
+    "sections",
+    "reflection",
+    "references"
+  ],
+  "additionalProperties": false
+}

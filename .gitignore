@@ -1,0 +1,4 @@
+.env
+data/
+.DS_Store
+run_meeting_secretary.sh
