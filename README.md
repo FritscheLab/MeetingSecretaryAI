@@ -72,6 +72,21 @@ conda activate meetingsecretaryai_env
 python meeting_secretary_gui.py
 ```
 
+## 🔧 Main Scripts
+
+| Script | Description |
+|--------|-------------|
+| `meeting_secretary_gui.py` | Graphical interface for processing transcripts and generating minutes. |
+| `meeting_utils.py` | Helper library for tasks such as Zoom meeting detection and token management. |
+| `scripts/transcript2json.py` | Converts raw transcripts into structured JSON minutes. |
+| `scripts/json2word.py` | Creates DOCX or Markdown minutes from JSON. |
+| `scripts/generate_minutes.sh` | Convenience shell script that chains the two conversion steps. |
+
+The typical workflow is to run `scripts/transcript2json.py` on a transcript file and then
+`scripts/json2word.py` to produce documents. For a graphical experience, launch
+`meeting_secretary_gui.py`, which orchestrates the full process. The shell
+script `scripts/generate_minutes.sh` demonstrates how these pieces fit together.
+
 ---
 
 ## 📁 Repository Structure
@@ -83,6 +98,8 @@ MeetingSecretaryAI_1.0/
 ├── setup_enhanced.sh                  # Automated setup script
 ├── requirements.txt                   # Python dependencies
 ├── config.ini                         # Configuration file
+├── CONTRIBUTING.md                    # How to contribute
+├── CHANGELOG.md                       # Release history
 ├── .env                              # Environment variables
 ├── scripts/                          # Core processing scripts
 │   ├── transcript2json.py            # Transcript to JSON conversion
@@ -93,7 +110,9 @@ MeetingSecretaryAI_1.0/
 ├── doc/                              # Documentation
 │   ├── templates/                    # Template files
 │   ├── transcript2json.md            # Script documentation
-│   └── json2word.md                  # Script documentation
+│   ├── json2word.md                  # Script documentation
+│   ├── FAQ.md                        # Frequently asked questions
+│   └── architecture.md              # Workflow diagram
 ├── tests/                            # Test scripts
 │   ├── test_enhanced_features.py     # Feature testing
 │   └── test_time_rounding.py         # Time rounding tests

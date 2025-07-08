@@ -33,7 +33,7 @@ This repository automates meeting documentation: transcript processing, agenda g
 
 ## Architecture
 
-![Workflow diagram](doc/architecture.png)
+![Workflow diagram](doc/architecture.md)
 
 **Data flow:**
 1. **Transcript ingestion** → `scripts/transcript2json.py`
