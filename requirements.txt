@@ -1,5 +1,23 @@
-# MeetingSecretaryAI_2.0/requirements.txt
-openai>=1.0.0
-python-dotenv>=1.0.0
-python-docx>=0.8.11
-thefuzz[speedup]>=0.19.0
+# Environment handling
+python-dotenv==1.0.1
+
+# Azure OpenAI integration
+openai==1.65.4
+
+# Configuration file parsing
+configparser==6.0.0
+
+# Document generation
+python-docx==1.1.0
+
+# Date/time handling (standard in Python but including common helper)
+pendulum==3.0.0
+
+# Optional: For argument parsing enhancements (already covered by argparse in stdlib)
+# argparse==1.4.0
+
+# For markdown processing (if future support is needed)
+markdown==3.5.2
+
+# Audio processing with WhisperX
+whisperx

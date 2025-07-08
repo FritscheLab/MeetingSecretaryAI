@@ -25,63 +25,26 @@ def format_month_year(date_str):
     except ValueError:
         return date_str
 
-def format_date(date_str, for_display=True):
+def format_date(date_str):
     """
-    Converts dates to the desired format. Handles multiple input formats:
-    - 'YYYY-MM-DD'
-    - 'YYYYMMDD'
-    When for_display=True (default): Returns "Month DD, YYYY" format for display in documents
-    When for_display=False: Returns "YYYYMMDD" format for filenames
-    Returns "TBD" if applicable or original string if parsing fails.
+    Converts 'YYYY-MM-DD' into 'Month DD, YYYY'. Returns "TBD" if applicable.
     """
-    if not date_str or date_str.upper() == "TBD":
+    if date_str.upper() == "TBD":
         return "TBD"
-    
-    formats_to_try = ["%Y%m%d", "%Y-%m-%d"]
-    
-    for fmt in formats_to_try:
-        try:
-            date_obj = datetime.strptime(date_str, fmt)
-            # Return in requested format
-            if for_display:
-                return date_obj.strftime("%B %d, %Y")  # "April 14, 2025"
-            else:
-                return date_obj.strftime("%Y%m%d")  # "20250414" 
-        except ValueError:
-            continue
-    
-    # If all parsing attempts fail, return the original string
-    return date_str
+    try:
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+        return date_obj.strftime("%B %d, %Y")
+    except ValueError:
+        return date_str
 
 def format_time(time_str):
     """
-    Converts time strings to 'HH:MM AM/PM' format. Handles:
-    - 'HH:MM' (24-hour)
-    - 'HH:MM AM/PM' (if already formatted, just ensures consistency)
-    Returns the original string if invalid.
+    Converts 'HH:MM' into 'HH:MM AM/PM'. Returns the original string if invalid.
     """
-    if not time_str:
-        return ""
-        
-    # If time already contains AM/PM, try to standardize the format
-    if "AM" in time_str.upper() or "PM" in time_str.upper():
-        try:
-            # Try to parse it in 12-hour format with AM/PM
-            for fmt in ["%I:%M %p", "%I:%M%p", "%I:%M %P", "%I:%M%P"]:
-                try:
-                    time_obj = datetime.strptime(time_str, fmt)
-                    return time_obj.strftime("%I:%M %p")
-                except ValueError:
-                    continue
-        except Exception:
-            pass  # If this fails, try the 24-hour format below
-    
-    # Try 24-hour format
     try:
         time_obj = datetime.strptime(time_str, "%H:%M")
         return time_obj.strftime("%I:%M %p")
     except ValueError:
-        # If all parsing attempts fail, return the original string
         return time_str
 
 def set_background_color(run, color):
@@ -201,7 +164,7 @@ def create_meeting_minutes(json_data, include_rationale=False, include_recommend
     # Meeting Details: Date, Time, Location
     meeting_details = json_data['meeting_details']
     details_paragraph = doc.add_paragraph(style='Normal')
-    add_bold_text(details_paragraph, "Date: ", format_date(meeting_details['date'], for_display=True) + "\n")
+    add_bold_text(details_paragraph, "Date: ", format_date(meeting_details['date']) + "\n")
     add_bold_text(details_paragraph, "Time: ", format_time(meeting_details['time']) + "\n")
     add_bold_text(details_paragraph, "Location: ", meeting_details['location'] + "\n")
 
@@ -337,66 +300,54 @@ def create_meeting_minutes(json_data, include_rationale=False, include_recommend
                         add_internal_hyperlink(ref_paragraph, "ReferenceAppendix", ref_title)
 
     # Next Meeting and Adjournment Section
+    doc.add_heading('Next Meeting and Adjournment', level=1)
     next_meeting = json_data.get('next_meeting', {})
     adjournment = json_data.get('adjournment', {})
 
-    date_val = next_meeting.get('date', '').strip() if next_meeting else ''
-    time_val = next_meeting.get('time', '').strip() if next_meeting else ''
-    location_val = next_meeting.get('location', '').strip() if next_meeting else ''
-    
-    # Only add this section if there's next meeting or adjournment information
-    if (date_val and time_val) or (adjournment and adjournment.get('time', '')):
-        doc.add_heading('Next Meeting and Adjournment', level=1)
-        
-        if date_val and time_val and location_val:
-            next_meeting_text = f"Next Meeting: {format_date(date_val, for_display=True)} at {format_time(time_val)}, {location_val}."
-            doc.add_paragraph(next_meeting_text, style='Normal')
-        elif date_val and time_val:
-            next_meeting_text = f"Next Meeting: {format_date(date_val, for_display=True)} at {format_time(time_val)}."
-            doc.add_paragraph(next_meeting_text, style='Normal')
-    
-        adjournment_time = adjournment.get('time', '').strip() if adjournment else ''
-        if adjournment_time:
-            adjournment_text = f"Adjournment: {format_time(adjournment_time)}."
-            doc.add_paragraph(adjournment_text, style='Normal')
+    date_val = next_meeting.get('date', '').strip()
+    time_val = next_meeting.get('time', '').strip()
+    location_val = next_meeting.get('location', '').strip()
 
-    # Generate Summarized Action Items Recap from the JSON input
-    recap_dict = generate_action_items_recap(json_data)
-    recap_list = []
-    for responsible, tasks in recap_dict.items():
-        recap_list.append({"responsible": responsible, "tasks": "; ".join(tasks)})
+    if date_val and time_val and location_val:
+        next_meeting_text = f"Next Meeting: {format_date(date_val)} at {format_time(time_val)}, {location_val}."
+    else:
+        next_meeting_text = "Next Meeting: Information not available."
+
+    adjournment_time = adjournment.get('time', '').strip()
+    if adjournment_time:
+        adjournment_text = f"Adjournment: {format_time(adjournment_time)}."
+    else:
+        adjournment_text = "Adjournment: Not specified."
+
+    doc.add_paragraph(f"{next_meeting_text}\n{adjournment_text}", style='Normal')
 
     # Summarized Action Items Section (inserted on a new page)
     doc.add_page_break()
     target_paragraph = doc.add_heading('Summarized Action Items', level=1)
     add_bookmark(target_paragraph, "SummarizedActionItems")
 
+    recap_dict = generate_action_items_recap(json_data)
+
+    # create table
     table = doc.add_table(rows=1, cols=2, style='Table Grid')
     hdr_cells = table.rows[0].cells
     hdr_cells[0].text = 'Responsible'
     hdr_cells[1].text = 'Tasks'
-
     hdr_cells[0].paragraphs[0].runs[0].bold = True
     hdr_cells[1].paragraphs[0].runs[0].bold = True
-    
-    # Set the width of the 'Responsible' column to 1 inch
-    table.columns[0].width = Inches(1)
 
-    for item in recap_list:
+    # populate rows using recap_dict
+    for responsible, tasks in recap_dict.items():
         row_cells = table.add_row().cells
-        row_cells[0].text = item['responsible']
-        
-        # For bullet points, we need to add each task as a separate paragraph
-        tasks_list = item['tasks'].split('; ')
-        for i, task in enumerate(tasks_list):
-            if i == 0:
-                # Use the first paragraph that's already in the cell
-                p = row_cells[1].paragraphs[0]
-                p.style = 'List Bullet'
-                p.text = task
-            else:
-                # Add new paragraphs for additional tasks
-                p = row_cells[1].add_paragraph(task, style='List Bullet')
+        row_cells[0].text = responsible
+
+        task_cell = row_cells[1]
+        # clear default content
+        task_cell.paragraphs[0].text = ''
+        # add each task as a bullet
+        for task in tasks:
+            p = task_cell.add_paragraph(style='List Bullet')
+            p.add_run(task)
 
     # Reference Appendix Section (inserted on a new page)
     doc.add_page_break()
@@ -414,7 +365,7 @@ def create_meeting_minutes(json_data, include_rationale=False, include_recommend
     # Footer with Version Info and Page Numbers
     footer = doc.sections[0].footer
     version_paragraph = footer.add_paragraph()
-    version_paragraph.text = f"Version: 1.0 ({format_date(today_str, for_display=True)})"
+    version_paragraph.text = f"Version: 1.0 ({format_date(today_str)})"
     version_paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
     page_paragraph = footer.add_paragraph()
@@ -442,7 +393,7 @@ def create_meeting_minutes_markdown(json_data, include_rationale=False, include_
 
     # Meeting Details
     meeting_details = json_data['meeting_details']
-    lines.append(f"**Date:** {format_date(meeting_details['date'], for_display=True)}")
+    lines.append(f"**Date:** {format_date(meeting_details['date'])}")
     lines.append(f"**Time:** {format_time(meeting_details['time'])}")
     lines.append(f"**Location:** {meeting_details['location']}")
     lines.append("")
@@ -555,46 +506,41 @@ def create_meeting_minutes_markdown(json_data, include_rationale=False, include_
                     lines.append(f"References: {refs}")
                     lines.append("")
     # Next Meeting and Adjournment Section
+    lines.append("## Next Meeting and Adjournment")
     next_meeting = json_data.get('next_meeting', {})
     adjournment = json_data.get('adjournment', {})
     
-    date_val = next_meeting.get('date', '').strip() if next_meeting else ''
-    time_val = next_meeting.get('time', '').strip() if next_meeting else ''
-    location_val = next_meeting.get('location', '').strip() if next_meeting else ''
+    date_val = next_meeting.get('date', '').strip()
+    time_val = next_meeting.get('time', '').strip()
+    location_val = next_meeting.get('location', '').strip()
     
-    # Only add this section if there's next meeting or adjournment information
-    if (date_val and time_val) or (adjournment and adjournment.get('time', '')):
-        lines.append("## Next Meeting and Adjournment")
-        
-        if date_val and time_val and location_val:
-            lines.append(f"**Next Meeting:** {format_date(date_val, for_display=True)} at {format_time(time_val)}, {location_val}.")
-        elif date_val and time_val:
-            lines.append(f"**Next Meeting:** {format_date(date_val, for_display=True)} at {format_time(time_val)}.")
-        
-        adjournment_time = adjournment.get('time', '').strip() if adjournment else ''
-        if adjournment_time:
-            lines.append(f"**Adjournment:** {format_time(adjournment_time)}.")
-            
-        lines.append("")
+    if date_val and time_val and location_val:
+        lines.append(f"**Next Meeting:** {format_date(date_val)} at {format_time(time_val)}, {location_val}.")
+    else:
+        lines.append("**Next Meeting:** Information not available.")
     
-    # Generate Summarized Action Items Recap from the JSON input
-    recap_dict = generate_action_items_recap(json_data)
-    recap_list = []
-    for responsible, tasks in recap_dict.items():
-        recap_list.append({"responsible": responsible, "tasks": "; ".join(tasks)})
+    adjournment_time = adjournment.get('time', '').strip()
+    if adjournment_time:
+        lines.append(f"**Adjournment:** {format_time(adjournment_time)}.")
+    else:
+        lines.append("**Adjournment:** Not specified.")
+    lines.append("")
     
-    # Summarized Action Items Section
+    # Generate Summarized Action Items Recap from the JSON input    
     lines.append("## Summarized Action Items")
     lines.append("")
     lines.append("| Responsible | Tasks |")
     lines.append("| ----------- | ----- |")
-    for item in recap_list:
-        # Split tasks and format as bullet points in markdown
-        tasks_list = item['tasks'].split('; ')
-        tasks_with_bullets = "<br>• " + "<br>• ".join(tasks_list)
-        lines.append(f"| {item['responsible']} | {tasks_with_bullets[4:]} |")  # Remove leading <br>
+
+    # use recap_dict directly
+    recap_dict = generate_action_items_recap(json_data)
+    for responsible, tasks in recap_dict.items():
+        # render each task as a markdown bullet list inside the cell using <br> line breaks
+        bullets = "<br>".join(f"- {t}" for t in tasks)
+        lines.append(f"| {responsible} | {bullets} |")
+
     lines.append("")
-    
+        
     # Reference Appendix Section with Markdown anchor
     lines.append("## Reference Appendix {#reference-appendix}")
     lines.append("")

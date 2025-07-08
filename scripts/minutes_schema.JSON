@@ -5,8 +5,8 @@
       "type": "object",
       "properties": {
         "title": { "type": "string" },
-        "date": { "type": "string", "description": "Date of the meeting in YYYYMMDD format" },
-        "time": { "type": "string", "description": "Time of the meeting in 12-hour format (e.g., '1:00 PM')" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
         "location": { "type": "string" },
         "attendees": {
           "type": "array",
@@ -141,6 +141,24 @@
         "additionalProperties": false
       }
     },
+    "next_meeting": {
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "location": { "type": "string" }
+      },
+      "required": ["date", "time", "location"],
+      "additionalProperties": false
+    },
+    "adjournment": {
+      "type": "object",
+      "properties": {
+        "time": { "type": "string" }
+      },
+      "required": ["time"],
+      "additionalProperties": false
+    },
     "reflection": {
       "type": "string"
     },
@@ -165,6 +183,8 @@
   "required": [
     "meeting_details",
     "sections",
+    "next_meeting",
+    "adjournment",
     "reflection",
     "references"
   ],

@@ -12,10 +12,10 @@ def load_file_content(file_path):
     with open(file_path, 'r') as file:
         return file.read()
 
-def load_system_prompt(prompt_file_path, context, agenda=""):
+def load_system_prompt(prompt_file_path, context, agenda):
     """
-    Loads the system prompt from an external file and formats it with the provided context.
-    The external prompt may contain placeholders {context} and {agenda}, but agenda is optional.
+    Loads the system prompt from an external file and formats it with the provided context and agenda.
+    The external prompt should contain placeholders {context} and {agenda}.
     """
     prompt_template = load_file_content(prompt_file_path)
     return prompt_template.format(context=context, agenda=agenda)
@@ -48,13 +48,18 @@ def generate_summary(system_prompt, transcript_content, model, response_settings
             }
         }
 
-        if not (model.startswith("o1") or model.startswith("o3")):
+        if not (model.startswith("o1") or model.startswith("o3") or model.startswith("o4")):
             response_args.update({
                 "temperature": response_settings['temperature'],
                 "max_tokens": response_settings['max_tokens'],
                 "top_p": response_settings['top_p'],
                 "frequency_penalty": response_settings['frequency_penalty'],
                 "presence_penalty": response_settings['presence_penalty']
+            })
+
+        if (model.startswith("o4")):
+            response_args.update({
+                "max_completion_tokens": response_settings['max_completion_tokens'],
             })
 
         response = client.chat.completions.create(**response_args)
@@ -75,9 +80,9 @@ def generate_summary(system_prompt, transcript_content, model, response_settings
 
 def process_meeting_file(input_file_path, context_file_path, agenda_file_path, prompt_file_path,
                          output_file_path, model, response_settings, json_schema, client):
-    # Load context, agenda (if provided), and system prompt
+    # Load context, agenda, and system prompt
     context = load_file_content(context_file_path)
-    agenda = load_file_content(agenda_file_path) if agenda_file_path else ""
+    agenda = load_file_content(agenda_file_path)
     system_prompt = load_system_prompt(prompt_file_path, context, agenda)
 
     # Load transcript content
@@ -96,7 +101,7 @@ def main():
     parser = argparse.ArgumentParser(description="Generate meeting minutes from a transcript using Azure OpenAI.")
     parser.add_argument("--input_file", required=True, help="Path to the meeting transcript file.")
     parser.add_argument("--context_file", required=True, help="Path to the context file.")
-    parser.add_argument("--agenda_file", help="Path to the agenda file (optional).")
+    parser.add_argument("--agenda_file", required=True, help="Path to the agenda file.")
     parser.add_argument("--output_file", required=True, help="Path where the output file will be saved.")
     parser.add_argument("--prompt_file", default="scripts/prompt.md",
                         help="Path to the system prompt file (default: scripts/prompt.md).")
@@ -115,6 +120,7 @@ def main():
     response_settings = {
         'temperature': config.getfloat('response_settings', 'temperature'),
         'max_tokens': config.getint('response_settings', 'max_tokens'),
+        'max_completion_tokens': config.getint('response_settings', 'max_completion_tokens'),        
         'top_p': config.getfloat('response_settings', 'top_p'),
         'frequency_penalty': config.getfloat('response_settings', 'frequency_penalty'),
         'presence_penalty': config.getfloat('response_settings', 'presence_penalty')
@@ -130,7 +136,7 @@ def main():
 
     # Initialize the Azure OpenAI client with the API key from environment variables
     client = AzureOpenAI(
-        api_key=os.environ['OPENAI_API_KEY'],
+        api_key=os.environ['AZURE_OPENAI_API_KEY'],
         api_version=os.environ['API_VERSION'],
         azure_endpoint=os.environ['OPENAI_API_BASE'],
         organization=os.environ['OPENAI_ORGANIZATION']
@@ -139,7 +145,7 @@ def main():
     process_meeting_file(
         input_file_path=args.input_file,
         context_file_path=args.context_file,
-        agenda_file_path=args.agenda_file if args.agenda_file else None,
+        agenda_file_path=args.agenda_file,
         prompt_file_path=args.prompt_file,
         output_file_path=args.output_file,
         model=model,
