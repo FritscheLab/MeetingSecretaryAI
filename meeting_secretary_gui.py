@@ -6,6 +6,7 @@ import os
 import tempfile
 import shutil
 import datetime
+import sys
 from meeting_utils import ZoomMeetingScanner, ContextManager, TokenManager, AudioProcessor, round_time_to_15_min
 
 # --- Backend Script Runner ---
@@ -15,7 +16,7 @@ def run_generation_process(transcript_data, transcript_is_file,
                            agenda_data, agenda_is_file,
                            minutes_style, output_folder, output_format,
                            status_bar_update_func, include_rationale=False, 
-                           include_recommendations=False):
+                           include_recommendations=False, completion_callback=None):
     """
     Runs the transcript2json.py and json2word.py scripts with the provided inputs.
     Handles temporary file creation for pasted text.
@@ -114,7 +115,14 @@ def run_generation_process(transcript_data, transcript_is_file,
         # Step 2: json2word.py
         datestamp = datetime.datetime.now().strftime("%Y%m%d")
         output_prefix = f"{safe_meeting_name}_Minutes_{datestamp}"
-        output_format_arg = output_format.lower()
+        
+        # Map GUI format options to script format options
+        format_mapping = {
+            "both": "both",
+            "docx": "docx", 
+            "markdown": "md"
+        }
+        output_format_arg = format_mapping.get(output_format.lower(), "docx")
 
         if not os.path.exists(json_output_file):
             raise FileNotFoundError(f"Intermediate JSON file was not created: {json_output_file}")
@@ -182,6 +190,10 @@ def run_generation_process(transcript_data, transcript_is_file,
                 print(f"Warning: Failed to cleanup temporary directory '{temp_dir}': {e}")
 
         status_bar_update_func(final_status)
+        
+        # Call completion callback if provided
+        if completion_callback:
+            completion_callback(final_status.startswith("Generation complete!"))
 
 
 # --- GUI Application Class ---
@@ -923,7 +935,8 @@ You can still use the app with other input methods (transcript files, audio file
                 self.output_format.get(),
                 self._update_status,
                 self.include_rationale.get(),
-                self.include_recommendations.get()
+                self.include_recommendations.get(),
+                self._on_generation_complete
             ), daemon=True)
             thread.start()
             
@@ -979,6 +992,44 @@ You can still use the app with other input methods (transcript files, audio file
         
         self.meetings_tree.configure(height=height)
 
+    def _on_generation_complete(self, success):
+        """Handle completion of minutes generation and show continue/quit popup."""
+        def show_popup():
+            if success:
+                result = messagebox.askyesno(
+                    "Generation Complete",
+                    "Meeting minutes have been generated successfully!\n\n"
+                    "Would you like to generate another minutes file?\n\n"
+                    "Click 'Yes' to generate another file, or 'No' to quit the application.",
+                    default='yes'
+                )
+                
+                if not result:  # User clicked 'No' - quit the application
+                    self._graceful_exit()
+            else:
+                result = messagebox.askyesno(
+                    "Generation Failed",
+                    "There was an error generating the meeting minutes.\n\n"
+                    "Would you like to try again?\n\n"
+                    "Click 'Yes' to continue using the application, or 'No' to quit.",
+                    default='yes'
+                )
+                
+                if not result:  # User clicked 'No' - quit the application
+                    self._graceful_exit()
+        
+        # Schedule the popup to run on the main thread
+        self.after(100, show_popup)
+
+    def _graceful_exit(self):
+        """Gracefully exit the application."""
+        try:
+            self.quit()
+            self.destroy()
+        except:
+            pass
+        # Force exit to ensure terminal closes
+        sys.exit(0)
 
 # --- Run the App ---
 if __name__ == "__main__":

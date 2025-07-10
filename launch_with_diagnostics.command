@@ -78,7 +78,12 @@ echo "================================"
 
 # Launch the application
 python meeting_secretary_gui.py
+exit_code=$?
 
 echo ""
-echo "Meeting Secretary AI has closed."
-read -p "Press Enter to exit..."
+if [ $exit_code -eq 0 ]; then
+    echo "Meeting Secretary AI closed normally."
+else
+    echo "Meeting Secretary AI closed with error code: $exit_code"
+    read -p "Press Enter to exit..."
+fi
