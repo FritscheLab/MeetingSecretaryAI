@@ -254,9 +254,22 @@ class AudioProcessor:
         # Ensure output directory exists
         os.makedirs(output_dir, exist_ok=True)
         
-        # WhisperX command
+        # WhisperX command - try to find the correct whisperx executable
+        import shutil
+        whisperx_path = shutil.which("whisperx")
+        if not whisperx_path:
+            # Try the expected path in the meetingsecretaryai_env environment
+            whisperx_path = "/Users/larsf/miniforge3/envs/meetingsecretaryai_env/bin/whisperx"
+            if not os.path.exists(whisperx_path):
+                # Fallback to trying to find it in the current Python environment
+                import sys
+                python_dir = os.path.dirname(sys.executable)
+                whisperx_path = os.path.join(python_dir, "whisperx")
+                if not os.path.exists(whisperx_path):
+                    whisperx_path = "whisperx"  # Last resort - use system PATH
+        
         cmd = [
-            "whisperx", audio_file,
+            whisperx_path, audio_file,
             "--model", "large-v3",
             "--diarize",
             "--hf_token", token,

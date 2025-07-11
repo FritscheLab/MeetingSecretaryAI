@@ -51,7 +51,7 @@ fi
 
 # Check Python and required modules
 echo "Checking Python environment..."
-python -c "import tkinter; print('✓ tkinter available')" 2>/dev/null
+/Users/larsf/miniforge3/envs/meetingsecretaryai_env/bin/python -c "import tkinter; print('✓ tkinter available')" 2>/dev/null
 if [ $? -ne 0 ]; then
     echo "ERROR: tkinter not available"
     read -p "Press Enter to exit..."
@@ -77,7 +77,7 @@ echo "Starting Meeting Secretary AI..."
 echo "================================"
 
 # Launch the application
-python meeting_secretary_gui.py
+/Users/larsf/miniforge3/envs/meetingsecretaryai_env/bin/python meeting_secretary_gui.py
 exit_code=$?
 
 echo ""

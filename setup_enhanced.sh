@@ -42,6 +42,26 @@ pip install -r requirements.txt
 echo "Installing WhisperX..."
 pip install whisperx
 
+# Check for ffmpeg
+echo "Checking for ffmpeg..."
+if command -v ffmpeg &> /dev/null; then
+    echo "✓ ffmpeg is installed"
+else
+    echo "⚠ ffmpeg is not installed"
+    echo "Installing ffmpeg with Homebrew..."
+    if command -v brew &> /dev/null; then
+        brew install ffmpeg
+        echo "✓ ffmpeg installed successfully"
+    else
+        echo "❌ Homebrew not found. Please install ffmpeg manually:"
+        echo "   1. Install Homebrew from https://brew.sh/"
+        echo "   2. Run: brew install ffmpeg"
+        echo "   3. Or install ffmpeg from https://ffmpeg.org/download.html"
+        echo ""
+        echo "ffmpeg is required for audio processing with WhisperX."
+    fi
+fi
+
 # Check for HuggingFace token
 if [ ! -f "../MeetingSecretaryAI_Data/.hf_token.txt" ]; then
     echo ""

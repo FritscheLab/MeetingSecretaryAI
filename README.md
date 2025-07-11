@@ -41,6 +41,15 @@ The latest version includes a powerful GUI with automatic meeting detection, aud
 
 ## 🎯 Quick Start
 
+### Prerequisites
+
+**System Dependencies:**
+- **Python 3.9+** (managed via conda/mamba)
+- **ffmpeg** - Required for audio processing
+  - macOS: `brew install ffmpeg`
+  - Ubuntu/Debian: `sudo apt install ffmpeg`
+  - Windows: Download from [ffmpeg.org](https://ffmpeg.org/download.html)
+
 ### Option 1: Automated Setup (Recommended)
 ```bash
 git clone https://github.com/FritscheLab/MeetingSecretaryAI.git
@@ -165,6 +174,11 @@ Choose your input method:
 ### WhisperX Integration
 The system includes built-in WhisperX support for high-quality transcription:
 
+**Prerequisites:**
+- **ffmpeg** must be installed on your system (handled automatically by setup script)
+- **HuggingFace token** for speaker diarization models
+
+**Usage:**
 1. **Set HuggingFace Token**: Get token from [HuggingFace](https://huggingface.co/settings/tokens)
 2. **Select Audio File**: Choose your audio file
 3. **Process Audio**: Click "Process Audio" button
@@ -287,7 +301,12 @@ python tests/test_time_rounding.py
 
 2. **No Zoom meetings found**: Check `~/Documents/Zoom` directory exists
 
-3. **Audio processing fails**: Verify HuggingFace token in Settings tab
+3. **Audio processing fails**: 
+   - **Problem**: "No such file or directory 'whisperx'" or "ffmpeg not found"
+   - **Solution**: 
+     - Verify HuggingFace token in Settings tab
+     - Install ffmpeg: `brew install ffmpeg` (macOS) or `sudo apt install ffmpeg` (Ubuntu)
+     - Ensure using correct Python environment: `conda activate meetingsecretaryai_env`
 
 4. **API errors**: Check `.env` configuration file
 

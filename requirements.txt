@@ -20,4 +20,6 @@ pendulum==3.0.0
 markdown==3.5.2
 
 # Audio processing with WhisperX
+# Note: WhisperX also requires ffmpeg to be installed on your system
+# Install ffmpeg with: brew install ffmpeg (macOS) or apt install ffmpeg (Ubuntu)
 whisperx
