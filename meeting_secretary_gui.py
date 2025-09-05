@@ -234,7 +234,7 @@ class MeetingSecretaryApp(tk.Tk):
         self.agenda_file_path = tk.StringVar()
 
         self.minutes_style_options = ["Concise", "Moderate", "High Detail", "High Detail (In-Person/Unreliable ID)"]
-        self.minutes_style = tk.StringVar(value="High Detail")  # Default to high detail
+        self.minutes_style = tk.StringVar(value="Moderate")  # Default to moderate detail
 
         self.output_folder = tk.StringVar(value=os.path.abspath("../MeetingSecretaryAI_Data/output"))
         self.output_format_options = ["Both", "DOCX", "Markdown"]

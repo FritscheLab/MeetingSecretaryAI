@@ -209,18 +209,19 @@ Choose from multiple detail levels:
 
 ### Environment Variables (`.env`)
 ```ini
-MODEL=o4-mini
+MODEL=gpt-5
 OPENAI_API_BASE=https://api.umgpt.umich.edu/azure-openai-api
 AZURE_OPENAI_API_KEY=your_api_key
 OPENAI_ORGANIZATION=your_org_id
-API_VERSION=2025-01-01-preview
+API_VERSION=2025-04-01-preview
 ```
 
 ### Response Settings (`config.ini`)
 ```ini
 [response_settings]
 temperature = 0
-max_tokens = 16384
+max_tokens = 30384
+max_completion_tokens = 80000
 top_p = 1.0
 frequency_penalty = 0.0
 presence_penalty = 0.0

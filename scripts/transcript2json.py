@@ -48,7 +48,7 @@ def generate_summary(system_prompt, transcript_content, model, response_settings
             }
         }
 
-        if not (model.startswith("o1") or model.startswith("o3") or model.startswith("o4")):
+        if not (model.startswith("o1") or model.startswith("o3") or model.startswith("o4") or model.startswith("gpt-5") ):
             response_args.update({
                 "temperature": response_settings['temperature'],
                 "max_tokens": response_settings['max_tokens'],
@@ -57,7 +57,7 @@ def generate_summary(system_prompt, transcript_content, model, response_settings
                 "presence_penalty": response_settings['presence_penalty']
             })
 
-        if (model.startswith("o4")):
+        if (model.startswith("o4") or model.startswith("gpt-5")):
             response_args.update({
                 "max_completion_tokens": response_settings['max_completion_tokens'],
             })
