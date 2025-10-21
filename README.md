@@ -41,6 +41,8 @@ The latest version includes a powerful GUI with automatic meeting detection, aud
 
 ## 🎯 Quick Start
 
+Looking for a step-by-step install? See doc/INSTALLATION.md.
+
 ### Prerequisites
 
 **System Dependencies:**
