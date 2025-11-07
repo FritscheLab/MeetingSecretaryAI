@@ -1,329 +1,252 @@
-# Installation Guide (macOS)
+# Installation & First Run Tutorial
 
-This guide walks you through a clean setup of MeetingSecretaryAI on macOS, including Homebrew, Conda/Mamba, Python dependencies, and system tools required for audio processing and document generation.
-
-If you get stuck, see Troubleshooting at the end.
+> This walkthrough is written for people who are **new to Python, coming from Windows/macOS/Linux, or simply unsure where to start**. Follow the numbered steps in order—each ends with a quick checklist so you know you are ready to move on.
 
 ---
 
-## What you’ll install
+## 1. Before You Begin
 
-- Homebrew (package manager for macOS)
-- Miniforge (Conda) or Mambaforge (Conda + Mamba) for Python envs
-- A project-specific Conda environment with Python 3.9
-- Python packages from `requirements.txt` (includes WhisperX)
-- System tools: ffmpeg (required), LibreOffice (optional but recommended for DOCX viewing)
+| What you need | Why you need it |
+| --- | --- |
+| A computer with Windows 10/11, macOS 12+, or Ubuntu/Debian (or WSL on Windows) | Supported platforms |
+| 10 GB free disk space | Model weights + transcripts can be big |
+| Internet access | To download dependencies and WhisperX models |
+| A Hugging Face account (optional but recommended) | Required for WhisperX medium/large models |
+
+**Terminology recap (for newcomers):**
+- **Conda / Mamba** – tools that create isolated Python environments so you can install packages without breaking system Python.
+- **ffmpeg** – command-line utility WhisperX uses to read audio/video files.
+- **LibreOffice / Word** – lets you open the generated `.docx` minutes.
 
 ---
 
-## 0) Prerequisites
+## 2. Step-by-Step Installation
 
-- macOS 12+ (Apple Silicon supported)
-- Internet access
-- Terminal app (zsh is the default shell on macOS)
+### Step 2.1 – Install the system tools
 
-Optional (recommended): install Apple Command Line Tools once
+#### Windows 10/11 (PowerShell)
+1. **Open PowerShell as Administrator** (right-click → *Run as administrator*).
+2. **Install Git and ffmpeg** via Windows Package Manager:
+   ```powershell
+   winget install --id Git.Git -e
+   winget install --id Gyan.FFmpeg -e
+   ```
+   (If `winget` is unavailable, install [Git for Windows](https://git-scm.com/download/win) and download ffmpeg from [ffmpeg.org](https://ffmpeg.org/download.html).)
+3. **Install Miniforge (recommended)**
+   - Download the latest `Miniforge3-Windows-x86_64.exe` from the [conda-forge releases page](https://github.com/conda-forge/miniforge#miniforge3).
+   - Run the installer → keep “Add Miniforge3 to PATH” checked.
+4. **Initialize Conda for PowerShell**:
+   ```powershell
+   conda init powershell
+   ```
+   Close and reopen PowerShell so the change takes effect.
+5. *(Optional)* Install LibreOffice:
+   ```powershell
+   winget install --id TheDocumentFoundation.LibreOffice -e
+   ```
 
-```zsh
-xcode-select --install
+> *Prefer WSL?* Run `wsl --install`, reboot, then follow the **Linux** instructions below inside the Ubuntu shell. WSL is great if you want the same experience as Linux/macOS.
+
+#### macOS 12+ (zsh)
+1. Install the Apple Command Line Tools once:
+   ```zsh
+   xcode-select --install
+   ```
+2. Install [Homebrew](https://brew.sh):
+   ```zsh
+   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+   echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+   eval "$(/opt/homebrew/bin/brew shellenv)"
+   ```
+3. Install Miniforge or Mambaforge:
+   ```zsh
+   brew install miniforge   # or: brew install mambaforge
+   conda init zsh
+   exec $SHELL
+   ```
+4. Install system utilities:
+   ```zsh
+   brew install ffmpeg
+   brew install --cask libreoffice   # optional but helpful
+   ```
+
+#### Ubuntu/Debian (bash)
+```bash
+sudo apt update
+sudo apt install -y git ffmpeg libreoffice
 ```
-
----
-
-## 1) Install Homebrew
-
-Homebrew is used to install system tools like ffmpeg and LibreOffice.
-
-```zsh
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Add Homebrew to your shell (Apple Silicon)
-echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
-eval "$(/opt/homebrew/bin/brew shellenv)"
-
-# Verify
-brew --version
-```
-
-If you’re on an Intel Mac, Homebrew lives in `/usr/local` instead of `/opt/homebrew`.
-
----
-
-## 2) Install Conda (Miniforge or Mambaforge)
-
-Miniforge is a lightweight Conda distribution from conda-forge (best for Apple Silicon). Mambaforge includes mamba, a faster drop-in replacement for conda.
-
-Option A: Install via Homebrew (easy)
-
-```zsh
-# Choose one (Miniforge or Mambaforge)
-brew install miniforge   # conda
-# or
-brew install mambaforge  # conda + mamba
-```
-
-Option B: Install via official installers
-
-- Miniforge: https://github.com/conda-forge/miniforge
-- Mambaforge: https://github.com/conda-forge/miniforge#mambaforge
-
-Initialize Conda for zsh and restart the shell:
-
-```zsh
-conda init zsh
+Install Miniforge:
+```bash
+wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
+bash Miniforge3-Linux-x86_64.sh
+source ~/miniforge3/bin/activate
+conda init bash
 exec $SHELL
 ```
 
-Verify:
-
-```zsh
-conda --version
-```
+✅ **Checkpoint:** `git --version`, `conda --version`, and `ffmpeg -version` all work in your terminal.
 
 ---
 
-## 3) Clone the repository
+### Step 2.2 – Create a workspace and clone the repo
 
-```zsh
+```bash
+mkdir -p ~/Projects && cd ~/Projects
 git clone https://github.com/FritscheLab/MeetingSecretaryAI.git
 cd MeetingSecretaryAI
 ```
 
+On Windows, run the same commands in PowerShell (paths will be under `C:\Users\<you>\Projects`). If Git prompts for credentials, use your GitHub username or PAT.
+
+✅ **Checkpoint:** `pwd` (or `Get-Location`) ends with `MeetingSecretaryAI`.
+
 ---
 
-## 4) Create the Conda environment
+### Step 2.3 – Create the Python environment
 
-We use Python 3.9 to match the project’s tested dependencies.
+We test with Python 3.9. Create an isolated environment so dependencies do not fight with system Python.
 
-With conda:
-
-```zsh
+```bash
 conda create -n meetingsecretaryai_env python=3.9 -y
 conda activate meetingsecretaryai_env
 ```
 
-With mamba (if you installed Mambaforge):
+Prefer mamba? Swap `conda create` with `mamba create`. Prefer `venv`? See Appendix B.
 
-```zsh
-mamba create -n meetingsecretaryai_env python=3.9 -y
-conda activate meetingsecretaryai_env
-```
-
-Verify Python and tkinter (for the GUI):
-
-```zsh
-python --version
-python - <<'PY'
-import tkinter
-print('✓ tkinter available')
-PY
-```
+✅ **Checkpoint:** `python --version` prints `3.9.x` and the prompt shows `(meetingsecretaryai_env)`.
 
 ---
 
-## 5) Install Python dependencies
+### Step 2.4 – Install Python dependencies
 
-```zsh
-# From the repo root
+```bash
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Notes:
-- `requirements.txt` includes WhisperX and all needed libraries.
-- On first install this may download large packages (PyTorch, ONNXRuntime, etc.).
+If installation fails because of Torch/onnxruntime on Windows, make sure the Miniforge (not Microsoft Store) Python is active. For Apple Silicon, Conda automatically installs the correct arm64 wheels.
 
-Optional developer tools:
-
-```zsh
-pip install pytest black flake8
-```
-
----
-
-## 6) Install system dependencies
-
-ffmpeg is required for audio processing with WhisperX. LibreOffice is useful for viewing DOCX outputs.
-
-```zsh
-brew install ffmpeg
-brew install --cask libreoffice   # optional (or use Microsoft Word)
-```
-
----
-
-## 7) Create data folders and set permissions
-
-The GUI expects a sibling data directory and local output folder. Also ensure launcher scripts are executable.
-
-```zsh
-# From repo root
-mkdir -p ../MeetingSecretaryAI_Data/context
-mkdir -p ../MeetingSecretaryAI_Data/data
-mkdir -p ../MeetingSecretaryAI_Data/output
-mkdir -p ./output
-
-# Make scripts executable
-chmod +x scripts/*.sh 2>/dev/null || true
-chmod +x launch_with_diagnostics.command 2>/dev/null || true
-```
-
----
-
-## 8) Configure API settings and tokens
-
-### Azure OpenAI / OpenAI
-
-You can configure via `.env` or `config.ini` (both supported). Examples:
-
-`.env` (recommended for secrets):
-
-```ini
-MODEL=gpt-5
-OPENAI_API_BASE=https://api.umgpt.umich.edu/azure-openai-api
-AZURE_OPENAI_API_KEY=your_api_key
-OPENAI_ORGANIZATION=your_org_id
-API_VERSION=2025-04-01-preview
-```
-
-`config.ini` (used by some scripts):
-
-```ini
-[DEFAULT]
-api_key = your_api_key_here
-api_base = https://your-azure-openai-resource.openai.azure.com/
-api_version = 2024-02-01
-model = gpt-4
-```
-
-### HuggingFace token (for WhisperX diarization)
-
-- Create a token at https://huggingface.co/settings/tokens
-- Store it so the GUI can find it later:
-
-```zsh
-echo "hf_xxx_your_token_here" > ../MeetingSecretaryAI_Data/.hf_token.txt
-```
-
-You can also set the token in the GUI Settings tab.
-
----
-
-## 9) Verify the installation
-
-Quick checks:
-
-```zsh
-# GUI dependency
+✅ **Checkpoint:** `python - <<'PY' ...` snippet below runs without errors:
+```bash
 python - <<'PY'
-import tkinter
-print('tkinter OK')
+import tkinter, whisperx
+print("tkinter OK, whisperx OK")
+PY
+```
+
+---
+
+### Step 2.5 – Configure optional services
+
+1. **Hugging Face token (for larger WhisperX models)**
+   ```bash
+   mkdir -p ../MeetingSecretaryAI_Data
+   echo "hf_your_token_here" > ../MeetingSecretaryAI_Data/.hf_token.txt
+   ```
+   You can also paste the token into the GUI (Settings → WhisperX).
+2. **Azure OpenAI credentials**
+   - Copy `.env.example` to `.env` and fill in the Azure endpoint/key values.
+3. **Custom templates**
+   - Place DOCX/Markdown templates under `doc/templates/` and update `config.ini` if needed.
+
+✅ **Checkpoint:** `.env` exists and contains your keys (or plan to enter them through the GUI later).
+
+---
+
+### Step 2.6 – Verify the installation
+
+```bash
+python - <<'PY'
+import tkinter, whisperx
+print("Python deps OK")
 PY
 
-# WhisperX import (ffmpeg must be installed on PATH)
-python - <<'PY'
-import whisperx
-print('whisperx OK')
-PY
-
-# Optional: run tests
-pytest -q
+ffmpeg -version
+pytest -q   # optional smoke test
 ```
 
-If `pytest` isn’t installed, run:
+If `pytest` is missing, install it with `pip install pytest`.
 
-```zsh
-pip install pytest
-pytest -q
-```
+✅ **Checkpoint:** No errors from the commands above.
 
 ---
 
-## 10) Launch the app
+### Step 2.7 – Launch the app
 
-Option A: Double-click launcher (handles permissions and env checks)
+- **GUI (easiest)**
+  ```bash
+  conda activate meetingsecretaryai_env
+  python meeting_secretary_gui.py
+  ```
+  On macOS you can also double-click `launch_with_diagnostics.command`.
 
-- In Finder, double-click: `launch_with_diagnostics.command`
+- **CLI workflow**
+  ```bash
+  python scripts/transcript2json.py sample.vtt > meeting.json
+  python scripts/json2word.py meeting.json
+  bash scripts/generate_minutes.sh   # convenience wrapper
+  ```
 
-Option B: Launch from Terminal
-
-```zsh
-conda activate meetingsecretaryai_env
-python meeting_secretary_gui.py
-```
-
----
-
-## 11) CLI usage (without GUI)
-
-Convert a transcript to structured JSON and then to DOCX/Markdown:
-
-```zsh
-# Transcript → JSON
-python scripts/transcript2json.py sample.vtt > meeting.json
-
-# JSON → DOCX
-python scripts/json2word.py meeting.json
-
-# Or run the convenience script
-bash scripts/generate_minutes.sh
-```
+Keep `meetingsecretaryai_env` activated whenever you work with the project.
 
 ---
 
-## Troubleshooting
+## 3. Keeping the Installation Healthy
 
-- Homebrew not found
-  - Re-run shell env step: `eval "$(/opt/homebrew/bin/brew shellenv)"`
-  - Intel Macs use `/usr/local` instead of `/opt/homebrew`
-
-- Conda not found after install
-  - Run `conda init zsh` then `exec $SHELL`
-
-- ffmpeg not found
-  - `brew install ffmpeg`
-  - Verify with `ffmpeg -version`
-
-- tkinter missing
-  - Ensure you’re in the conda env created above
-  - Install tk if needed: `conda install -n meetingsecretaryai_env tk -y`
-
-- Permission errors accessing `~/Documents/Zoom`
-  - macOS Privacy: System Settings → Privacy & Security → Files and Folders
-  - Grant “Terminal” access to “Documents Folder”
-  - You can still use the app by selecting files manually
-
-- WhisperX model errors
-  - Ensure HuggingFace token is set
-  - ffmpeg must be present
-
-- On Apple Silicon performance
-  - The installed PyTorch wheel targets Metal/CPU. For GPU acceleration, see PyTorch’s Apple Silicon docs. WhisperX will still work on CPU.
+- Update dependencies occasionally:
+  ```bash
+  conda activate meetingsecretaryai_env
+  conda update --all
+  pip install --upgrade -r requirements.txt
+  ```
+- Back up your `.env`, templates, and generated data (output lives in `output/` by default).
+- If you switch machines, copy the whole repo plus the `../MeetingSecretaryAI_Data` folder that stores tokens.
 
 ---
 
-## Uninstall / Clean up
+## 4. Troubleshooting / FAQ
 
-```zsh
+| Issue | Fix |
+| --- | --- |
+| `conda` command not found | Re-run `conda init <shell>` and restart the terminal. On Windows ensure you launched the *Miniforge Prompt* or PowerShell **after** running `conda init`. |
+| `ffmpeg` missing or wrong version | Verify `ffmpeg -version`. If not found, reinstall via winget/brew/apt. Add it to PATH on Windows if you unpacked a ZIP manually. |
+| `ImportError: No module named whisperx` | Confirm the env is active (`conda activate meetingsecretaryai_env`) and reinstall `pip install whisperx`. |
+| GUI cannot access Zoom folder on macOS | System Settings → Privacy & Security → Files and Folders → allow Terminal or Python to access Documents. |
+| Long path errors on Windows | Enable long paths once: run `reg add HKLM\SYSTEM\CurrentControlSet\Control\FileSystem /v LongPathsEnabled /t REG_DWORD /d 1 /f` from an elevated PowerShell and reboot. |
+| Slow installs on Windows | Use Mambaforge so `mamba` resolves dependencies faster: `winget install --id CondaForge.Mambaforge -e`. |
+
+Need more help? Open an issue with your OS version, Python version, and the exact command/output.
+
+---
+
+## 5. Uninstall / Reset
+
+```bash
 conda deactivate || true
 conda env remove -n meetingsecretaryai_env -y
-# Optional: remove Homebrew installs
-# brew uninstall ffmpeg
-# brew uninstall --cask libreoffice
 ```
+
+Remove optional system packages with `winget uninstall`, `brew uninstall`, or `sudo apt remove` as needed. You can delete the repo folder to remove code, and delete `../MeetingSecretaryAI_Data` if you no longer need cached tokens/models.
 
 ---
 
-## Appendix: Alternative using Python venv (no Conda)
+## Appendix A – Windows Tips
 
-This project is tested with Conda. If you prefer `venv`, you can try:
+- **Use the Miniforge Prompt** (installed with Miniforge) if PowerShell keeps launching the wrong Python.
+- **File paths**: When commands show `~/Projects`, translate to `C:\Users\<you>\Projects`.
+- **GPU acceleration**: WhisperX can use NVIDIA GPUs if you install CUDA-enabled PyTorch inside the same environment. Follow the [official instructions](https://pytorch.org/get-started/locally/) and then reinstall WhisperX.
 
-```zsh
-# Use Python 3.9 installed on your system
+---
+
+## Appendix B – Installing without Conda (advanced)
+
+Conda handles native dependencies (onnxruntime, PyTorch) for you. If you cannot use Conda:
+
+```bash
 python3.9 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate      # PowerShell: .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Note: Some packages (e.g., onnxruntime, torch) may be more tedious on Apple Silicon without conda-forge wheels. Prefer Conda/Mamba on macOS.
+You must manually install ffmpeg and ensure the correct wheel builds exist for your platform.

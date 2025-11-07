@@ -256,18 +256,24 @@ class AudioProcessor:
         
         # WhisperX command - try to find the correct whisperx executable
         import shutil
-        whisperx_path = shutil.which("whisperx")
-        if not whisperx_path:
-            # Try the expected path in the meetingsecretaryai_env environment
-            whisperx_path = "/Users/larsf/miniforge3/envs/meetingsecretaryai_env/bin/whisperx"
-            if not os.path.exists(whisperx_path):
-                # Fallback to trying to find it in the current Python environment
-                import sys
-                python_dir = os.path.dirname(sys.executable)
-                whisperx_path = os.path.join(python_dir, "whisperx")
+        # Prefer the whisperx that matches the current Python interpreter first
+        import sys
+        python_dir = os.path.dirname(sys.executable)
+        candidate = os.path.join(python_dir, "whisperx")
+        if os.path.exists(candidate):
+            whisperx_path = candidate
+        else:
+            # Then try PATH
+            whisperx_path = shutil.which("whisperx")
+            if not whisperx_path:
+                # Then try a known conda env path (legacy)
+                whisperx_path = "/Users/larsf/miniforge3/envs/meetingsecretaryai_env/bin/whisperx"
                 if not os.path.exists(whisperx_path):
-                    whisperx_path = "whisperx"  # Last resort - use system PATH
+                    # Last resort - let the system resolve from PATH
+                    whisperx_path = "whisperx"
         
+        # Note: WhisperX uses Faster-Whisper (CTranslate2). Valid devices are typically: auto, cpu, cuda, rocm, metal.
+        # "mps" is not supported here; use "auto" to let it select Metal if available, else fall back to CPU.
         cmd = [
             whisperx_path, audio_file,
             "--model", "large-v3",
@@ -278,7 +284,7 @@ class AudioProcessor:
             "--compute_type", "int8",
             "--batch_size", "16",
             "--output_dir", output_dir,
-            "--threads", "8"
+            "--threads", "12"
         ]
         
         def run_whisperx():

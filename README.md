@@ -41,47 +41,31 @@ The latest version includes a powerful GUI with automatic meeting detection, aud
 
 ## 🎯 Quick Start
 
-Looking for a step-by-step install? See doc/INSTALLATION.md.
+**Need a guided, beginner-friendly install (Windows/macOS/Linux)? Follow the full tutorial in [`doc/INSTALLATION.md`](doc/INSTALLATION.md).** It covers prerequisites, Conda/Mamba setup, ffmpeg installation, Hugging Face tokens, and the first GUI launch with checkpoints after each step.
 
-### Prerequisites
+### Snapshot of the install steps
+1. Install Git, Miniforge/Mambaforge, and ffmpeg using the commands for your OS (PowerShell, zsh, or bash) in the tutorial.
+2. Clone this repository and create the `meetingsecretaryai_env` Conda environment with Python 3.9.
+3. Run `pip install -r requirements.txt`, add your Hugging Face and Azure credentials, and verify with the provided smoke tests.
+4. Launch the GUI with `python meeting_secretary_gui.py` (or double-click `launch_with_diagnostics.command` on macOS).
 
-**System Dependencies:**
-- **Python 3.9+** (managed via conda/mamba)
-- **ffmpeg** - Required for audio processing
-  - macOS: `brew install ffmpeg`
-  - Ubuntu/Debian: `sudo apt install ffmpeg`
-  - Windows: Download from [ffmpeg.org](https://ffmpeg.org/download.html)
-
-### Option 1: Automated Setup (Recommended)
+### Fast commands (once prerequisites are in place)
 ```bash
 git clone https://github.com/FritscheLab/MeetingSecretaryAI.git
 cd MeetingSecretaryAI
+conda create -n meetingsecretaryai_env python=3.9 -y
+conda activate meetingsecretaryai_env
+pip install --upgrade pip
+pip install -r requirements.txt
+python meeting_secretary_gui.py
+```
+
+### Automated helper (macOS/Linux/WSL)
+```bash
 chmod +x setup_enhanced.sh
 ./setup_enhanced.sh
 ```
-
-### Option 2: Manual Setup
-```bash
-git clone https://github.com/FritscheLab/MeetingSecretaryAI.git
-cd MeetingSecretaryAI
-conda create -n meetingsecretaryai_env python=3.9
-conda activate meetingsecretaryai_env
-pip install -r requirements.txt
-```
-
-### Launch the GUI
-
-**Option 1: Double-click Launcher (Recommended)**
-```bash
-# Double-click this file in Finder:
-launch_with_diagnostics.command
-```
-
-**Option 2: Command Line**
-```bash
-conda activate meetingsecretaryai_env
-python meeting_secretary_gui.py
-```
+The script installs ffmpeg, creates the Conda env, and runs dependency checks. Windows users can follow the PowerShell instructions in `doc/INSTALLATION.md` to achieve the same result manually.
 
 ## 🔧 Main Scripts
 
