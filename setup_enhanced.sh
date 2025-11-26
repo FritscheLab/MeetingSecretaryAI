@@ -31,8 +31,16 @@ $CONDA_CMD create -n meetingsecretaryai_env python=3.9 -y
 
 # Activate environment
 echo "Activating environment..."
-eval "$($CONDA_CMD shell.bash hook)"
+if [ "$CONDA_CMD" = "mamba" ]; then
+    eval "$($CONDA_CMD shell hook --shell bash)"
+else
+    eval "$($CONDA_CMD shell.bash hook)"
+fi
 $CONDA_CMD activate meetingsecretaryai_env
+
+# Ensure Tkinter support (required for the GUI)
+echo "Ensuring Tkinter libraries are available..."
+$CONDA_CMD install -n meetingsecretaryai_env tk -y
 
 # Install requirements
 echo "Installing Python packages..."
@@ -85,20 +93,32 @@ fi
 # Check for config.ini
 if [ ! -f "config.ini" ]; then
     echo ""
-    echo "Creating basic config.ini..."
-    cat > config.ini << EOF
-[DEFAULT]
-# OpenAI API Configuration
-api_key = your_api_key_here
-api_base = https://your-azure-openai-resource.openai.azure.com/
-api_version = 2024-02-01
-model = gpt-4
-
-# Processing settings
-max_tokens = 4000
-temperature = 0.3
+    echo "Creating response_settings config.ini..."
+    cat > config.ini << 'EOF'
+[response_settings]
+temperature = 0
+max_tokens = 30384
+max_completion_tokens = 80000
+top_p = 1.0
+frequency_penalty = 0.0
+presence_penalty = 0.0
 EOF
-    echo "Basic config.ini created. Please edit it with your OpenAI/Azure settings."
+    echo "Config with response_settings created. Update values if your deployment needs different defaults."
+fi
+
+# Provide an .env template when missing so downstream scripts have the required vars
+if [ ! -f ".env" ]; then
+    echo ""
+    echo "Creating .env template..."
+    cat > .env << 'EOF'
+# Azure OpenAI deployment settings
+MODEL=gpt-5.1
+OPENAI_API_BASE=https://your-azure-openai-resource.openai.azure.com/
+AZURE_OPENAI_API_KEY=replace-with-your-key
+OPENAI_ORGANIZATION=replace-with-your-org
+API_VERSION=2025-04-01-preview
+EOF
+    echo ".env template created. Replace placeholder values with your deployment details."
 fi
 
 echo ""

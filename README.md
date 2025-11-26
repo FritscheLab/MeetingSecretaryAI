@@ -195,7 +195,7 @@ Choose from multiple detail levels:
 
 ### Environment Variables (`.env`)
 ```ini
-MODEL=gpt-5
+MODEL=gpt-5.1
 OPENAI_API_BASE=https://api.umgpt.umich.edu/azure-openai-api
 AZURE_OPENAI_API_KEY=your_api_key
 OPENAI_ORGANIZATION=your_org_id

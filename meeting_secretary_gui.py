@@ -150,12 +150,15 @@ def run_generation_process(transcript_data, transcript_is_file,
         final_status = f"Generation complete! Files in '{output_folder}' with prefix '{output_prefix}'"
         print("--- Generation Finished Successfully ---")
         
-        # Open output folder in Finder (macOS)
-        try:
-            subprocess.run(["open", output_folder], check=True)
-            print(f"Opened output folder in Finder: {output_folder}")
-        except subprocess.CalledProcessError:
-            print(f"Could not open output folder in Finder: {output_folder}")
+        # Open output folder in Finder when running on macOS
+        if sys.platform == "darwin":
+            try:
+                subprocess.run(["open", output_folder], check=True)
+                print(f"Opened output folder in Finder: {output_folder}")
+            except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+                print(f"Could not open output folder in Finder: {output_folder} ({exc})")
+        else:
+            print("Auto-opening the output folder is only available on macOS; skipping for this platform.")
 
     except subprocess.CalledProcessError as e:
         error_message = f"Error in script '{os.path.basename(e.cmd[1])}': Exit code {e.returncode}\n"
