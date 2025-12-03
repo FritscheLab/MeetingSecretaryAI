@@ -9,7 +9,6 @@
 | What you need | Why you need it |
 | --- | --- |
 | A computer with Windows 10/11, macOS 12+, or Ubuntu/Debian (or WSL on Windows) | Supported platforms |
-| 10 GB free disk space | Model weights + transcripts can be big |
 | Internet access | To download dependencies and WhisperX models |
 | A Hugging Face account (optional but recommended) | Required for WhisperX medium/large models |
 
