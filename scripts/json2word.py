@@ -342,12 +342,26 @@ def create_meeting_minutes(json_data, include_rationale=False, include_recommend
         row_cells[0].text = responsible
 
         task_cell = row_cells[1]
-        # clear default content
-        task_cell.paragraphs[0].text = ''
-        # add each task as a bullet
-        for task in tasks:
-            p = task_cell.add_paragraph(style='List Bullet')
-            p.add_run(task)
+        if tasks:
+            first_task_paragraph = task_cell.paragraphs[0]
+            first_task_paragraph.style = 'List Bullet'
+            first_task_paragraph.text = tasks[0]
+            for task in tasks[1:]:
+                task_cell.add_paragraph(task, style='List Bullet')
+        else:
+            task_cell.text = ''
+
+    # Set column widths (Responsible ~20%, Tasks ~80%)
+    section = doc.sections[0]
+    usable_width = section.page_width - section.left_margin - section.right_margin
+    responsible_width = int(usable_width * 0.2)
+    tasks_width = int(usable_width - responsible_width)
+    table.autofit = False
+    table.columns[0].width = responsible_width
+    table.columns[1].width = tasks_width
+    for row in table.rows:
+        row.cells[0].width = responsible_width
+        row.cells[1].width = tasks_width
 
     # Reference Appendix Section (inserted on a new page)
     doc.add_page_break()

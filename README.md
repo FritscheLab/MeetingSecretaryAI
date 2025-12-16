@@ -148,7 +148,7 @@ Choose your input method:
 - Paste or upload custom content
 
 ### 4. Settings Tab
-- Choose detail level (Concise, Moderate, High Detail, In-Person)
+- Choose detail level (Concise, Action-Focused, Moderate, High Detail, In-Person)
 - Set output format (DOCX, Markdown, Both)
 - Configure HuggingFace token for audio processing
 - Set output directory
@@ -185,6 +185,7 @@ Choose from multiple detail levels:
 | Level | Description | Use Case |
 |-------|-------------|----------|
 | **Concise** | Brief summaries | Quick overviews |
+| **Action-Focused** | Outcome- and action-oriented, de-duplicated | Browseable weekly minutes |
 | **Moderate** | Balanced detail | Standard meetings |
 | **High Detail** | Comprehensive coverage | Important decisions |
 | **In-Person** | No speaker identification | Unreliable audio |

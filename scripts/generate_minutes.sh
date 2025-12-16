@@ -19,7 +19,7 @@ topic="Study_Section"
 meeting="MockSession"
 date="20250307"
 
-# Detail level: high, moderate, concise
+# Detail level: action, high, moderate, concise
 detail_level="high"
 
 # Uncomment the following line to transcribe audio using WhisperX

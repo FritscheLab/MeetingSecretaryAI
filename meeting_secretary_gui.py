@@ -79,6 +79,7 @@ def run_generation_process(transcript_data, transcript_is_file,
         # Determine Prompt File
         style_map = {
             "Concise": "scripts/prompt_concise.md",
+            "Action-Focused": "scripts/prompt_action.md",
             "Moderate": "scripts/prompt_moderate.md",
             "High Detail": "scripts/prompt_high.md",
             "High Detail (In-Person/Unreliable ID)": "scripts/prompt_high_inperson.md"
@@ -236,7 +237,7 @@ class MeetingSecretaryApp(tk.Tk):
         self.agenda_source = tk.StringVar(value="paste")
         self.agenda_file_path = tk.StringVar()
 
-        self.minutes_style_options = ["Concise", "Moderate", "High Detail", "High Detail (In-Person/Unreliable ID)"]
+        self.minutes_style_options = ["Concise", "Action-Focused", "Moderate", "High Detail", "High Detail (In-Person/Unreliable ID)"]
         self.minutes_style = tk.StringVar(value="Moderate")  # Default to moderate detail
 
         self.output_folder = tk.StringVar(value=os.path.abspath("../MeetingSecretaryAI_Data/output"))
