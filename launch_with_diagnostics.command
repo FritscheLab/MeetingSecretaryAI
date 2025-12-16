@@ -51,7 +51,9 @@ fi
 
 # Check Python and required modules
 echo "Checking Python environment..."
-/Users/larsf/miniforge3/envs/meetingsecretaryai_env/bin/python -c "import tkinter; print('✓ tkinter available')" 2>/dev/null
+# Use `conda run` to ensure we use the env attached to this conda install
+# (avoids hard-coded env paths and activation edge cases when double-clicking .command)
+conda run -n meetingsecretaryai_env python -c "import tkinter; print('✓ tkinter available')" 2>/dev/null
 if [ $? -ne 0 ]; then
     echo "ERROR: tkinter not available"
     read -p "Press Enter to exit..."
@@ -77,7 +79,7 @@ echo "Starting Meeting Secretary AI..."
 echo "================================"
 
 # Launch the application
-/Users/larsf/miniforge3/envs/meetingsecretaryai_env/bin/python meeting_secretary_gui.py
+conda run -n meetingsecretaryai_env python meeting_secretary_gui.py
 exit_code=$?
 
 echo ""
