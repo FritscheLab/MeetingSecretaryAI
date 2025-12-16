@@ -241,6 +241,97 @@ class AudioProcessor:
     
     def __init__(self, token_manager):
         self.token_manager = token_manager
+
+    @staticmethod
+    def _coerce_int(value, default):
+        try:
+            return int(value)
+        except Exception:
+            return default
+
+    @staticmethod
+    def _auto_whisperx_settings():
+        """Pick reasonable WhisperX CLI settings for the current machine.
+
+        This aims for portable defaults across CPU-only Macs/PCs and CUDA machines.
+        Users can override any setting via environment variables:
+          - WHISPERX_MODEL
+          - WHISPERX_DEVICE (cpu|cuda|auto)
+          - WHISPERX_COMPUTE_TYPE (float16|float32|int8|int8_float32)
+          - WHISPERX_BATCH_SIZE (int)
+          - WHISPERX_THREADS (int)
+          - WHISPERX_VAD_METHOD (pyannote|silero)
+        """
+
+        import os
+        import platform
+
+        cpu_count = os.cpu_count() or 4
+
+        # Defaults that work well on CPU-only systems.
+        settings = {
+            "model": os.environ.get("WHISPERX_MODEL", "large-v3"),
+            "device": os.environ.get("WHISPERX_DEVICE"),
+            "compute_type": os.environ.get("WHISPERX_COMPUTE_TYPE"),
+            "batch_size": os.environ.get("WHISPERX_BATCH_SIZE"),
+            "threads": os.environ.get("WHISPERX_THREADS"),
+            "vad_method": os.environ.get("WHISPERX_VAD_METHOD"),
+        }
+
+        # Autodetect device if not overridden.
+        # IMPORTANT:
+        # - WhisperX uses Faster-Whisper (CTranslate2) for ASR, which typically supports
+        #   only "cpu" and "cuda" in many builds.
+        # - WhisperX also uses torch.device(device) for VAD/pyannote, so values like
+        #   "auto" will crash (torch has no "auto" device).
+        if not settings["device"]:
+            device = "cpu"
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    device = "cuda"
+            except Exception:
+                device = "cpu"
+            settings["device"] = device
+
+        # Validate device against the Faster-Whisper backend (CTranslate2) where possible.
+        # If unsupported (e.g., "mps"), fall back to CPU.
+        try:
+            if settings["device"] not in ("cpu", "cuda"):
+                settings["device"] = "cpu"
+        except Exception:
+            settings["device"] = "cpu"
+
+        # Autodetect compute_type if not overridden.
+        if not settings["compute_type"]:
+            # CUDA generally benefits from float16.
+            if settings["device"] == "cuda":
+                settings["compute_type"] = "float16"
+            else:
+                # CPU: int8 is usually the best speed/quality tradeoff.
+                settings["compute_type"] = "int8"
+
+        # Autodetect batch_size if not overridden.
+        if not settings["batch_size"]:
+            # Conservative default for stability across machines.
+            # Larger batch sizes can be faster but may increase memory pressure.
+            settings["batch_size"] = str(16 if cpu_count >= 8 else 8)
+
+        # Autodetect threads if not overridden.
+        if not settings["threads"]:
+            # WhisperX's --threads=0 lets torch choose; this is generally safest.
+            # If you want to hard-pin threads, set WHISPERX_THREADS.
+            settings["threads"] = "0"
+
+        # VAD choice: default to silero for maximum compatibility.
+        # (pyannote VAD model loading can be sensitive to torch serialization changes)
+        if not settings["vad_method"]:
+            settings["vad_method"] = "silero"
+
+        # Normalize numeric fields to strings for CLI.
+        settings["batch_size"] = str(AudioProcessor._coerce_int(settings["batch_size"], 8))
+        settings["threads"] = str(AudioProcessor._coerce_int(settings["threads"], 0))
+        return settings
         
     def process_audio(self, audio_file, output_dir, callback=None):
         """Process audio file with WhisperX."""
@@ -266,25 +357,25 @@ class AudioProcessor:
             # Then try PATH
             whisperx_path = shutil.which("whisperx")
             if not whisperx_path:
-                # Then try a known conda env path (legacy)
-                whisperx_path = "/Users/larsf/miniforge3/envs/meetingsecretaryai_env/bin/whisperx"
-                if not os.path.exists(whisperx_path):
-                    # Last resort - let the system resolve from PATH
-                    whisperx_path = "whisperx"
+                # Last resort - let the system resolve from PATH
+                whisperx_path = "whisperx"
+
+        settings = self._auto_whisperx_settings()
         
         # Note: WhisperX uses Faster-Whisper (CTranslate2). Valid devices are typically: auto, cpu, cuda, rocm, metal.
         # "mps" is not supported here; use "auto" to let it select Metal if available, else fall back to CPU.
         cmd = [
             whisperx_path, audio_file,
-            "--model", "large-v3",
+            "--model", settings["model"],
+            "--vad_method", settings["vad_method"],
             "--diarize",
             "--hf_token", token,
             "--language", "en",
-            "--device", "cpu",
-            "--compute_type", "int8",
-            "--batch_size", "16",
+            "--device", settings["device"],
+            "--compute_type", settings["compute_type"],
+            "--batch_size", settings["batch_size"],
             "--output_dir", output_dir,
-            "--threads", "12"
+            "--threads", settings["threads"],
         ]
         
         def run_whisperx():
