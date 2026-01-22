@@ -74,10 +74,12 @@ The script installs ffmpeg, creates the Conda env, and runs dependency checks. W
 | `meeting_secretary_gui.py` | Graphical interface for processing transcripts and generating minutes. |
 | `meeting_utils.py` | Helper library for tasks such as Zoom meeting detection and token management. |
 | `scripts/transcript2json.py` | Converts raw transcripts into structured JSON minutes. |
+| `scripts/json_refine.py` | Refines JSON minutes to reduce redundancy and improve readability. |
 | `scripts/json2word.py` | Creates DOCX or Markdown minutes from JSON. |
-| `scripts/generate_minutes.sh` | Convenience shell script that chains the two conversion steps. |
+| `scripts/generate_minutes.sh` | Convenience shell script that chains the conversion steps. |
 
-The typical workflow is to run `scripts/transcript2json.py` on a transcript file and then
+The typical workflow is to run `scripts/transcript2json.py` on a transcript file, pass the
+results through `scripts/json_refine.py` for redundancy and verbosity cleanup, and then use
 `scripts/json2word.py` to produce documents. For a graphical experience, launch
 `meeting_secretary_gui.py`, which orchestrates the full process. The shell
 script `scripts/generate_minutes.sh` demonstrates how these pieces fit together.
@@ -98,9 +100,11 @@ MeetingSecretaryAI_1.0/
 ├── .env                              # Environment variables
 ├── scripts/                          # Core processing scripts
 │   ├── transcript2json.py            # Transcript to JSON conversion
+│   ├── json_refine.py                # JSON refinement for readability
 │   ├── json2word.py                  # JSON to document conversion
 │   ├── generate_minutes.sh           # Shell script pipeline
 │   ├── prompt_*.md                   # Various detail level prompts
+│   ├── prompt_refine.md              # Refinement prompt
 │   └── minutes_schema.JSON           # Output schema definition
 ├── doc/                              # Documentation
 │   ├── templates/                    # Template files
@@ -197,6 +201,7 @@ Choose from multiple detail levels:
 ### Environment Variables (`.env`)
 ```ini
 MODEL=gpt-5.1
+REFINEMENT_MODEL=o3-mini
 OPENAI_API_BASE=https://api.umgpt.umich.edu/azure-openai-api
 AZURE_OPENAI_API_KEY=your_api_key
 OPENAI_ORGANIZATION=your_org_id
@@ -212,6 +217,8 @@ max_completion_tokens = 80000
 top_p = 1.0
 frequency_penalty = 0.0
 presence_penalty = 0.0
+reasoning_effort_transcript = low
+reasoning_effort_refine = medium
 ```
 
 ---
@@ -229,9 +236,14 @@ python scripts/transcript2json.py \
   --agenda_file agenda.md \
   --output_file minutes.json
 
+# Refine JSON for readability
+python scripts/json_refine.py \
+  --input_json minutes.json \
+  --output_json minutes_refined.json
+
 # Convert to documents
 python scripts/json2word.py \
-  --input_json minutes.json \
+  --input_json minutes_refined.json \
   --output_dir output/ \
   --output_prefix meeting_minutes \
   --output_format both

@@ -20,7 +20,8 @@ def load_system_prompt(prompt_file_path, context, agenda):
     prompt_template = load_file_content(prompt_file_path)
     return prompt_template.format(context=context, agenda=agenda)
 
-def generate_summary(system_prompt, transcript_content, model, response_settings, json_schema, client):
+def generate_summary(system_prompt, transcript_content, model, response_settings, json_schema,
+                     client, reasoning_effort):
     try:
         response_args = {
             "model": model,
@@ -48,7 +49,10 @@ def generate_summary(system_prompt, transcript_content, model, response_settings
             }
         }
 
-        if not (model.startswith("o1") or model.startswith("o3") or model.startswith("o4") or model.startswith("gpt-5") ):
+        if reasoning_effort:
+            response_args["reasoning_effort"] = reasoning_effort
+
+        if not (model.startswith("o1") or model.startswith("o3") or model.startswith("o4") or model.startswith("gpt-5")):
             response_args.update({
                 "temperature": response_settings['temperature'],
                 "max_tokens": response_settings['max_tokens'],
@@ -79,7 +83,8 @@ def generate_summary(system_prompt, transcript_content, model, response_settings
         return None
 
 def process_meeting_file(input_file_path, context_file_path, agenda_file_path, prompt_file_path,
-                         output_file_path, model, response_settings, json_schema, client):
+                         output_file_path, model, response_settings, json_schema, client,
+                         reasoning_effort):
     # Load context, agenda, and system prompt
     context = load_file_content(context_file_path)
     agenda = load_file_content(agenda_file_path)
@@ -88,7 +93,15 @@ def process_meeting_file(input_file_path, context_file_path, agenda_file_path, p
     # Load transcript content
     transcript_content = load_file_content(input_file_path)
 
-    structured_output = generate_summary(system_prompt, transcript_content, model, response_settings, json_schema, client)
+    structured_output = generate_summary(
+        system_prompt,
+        transcript_content,
+        model,
+        response_settings,
+        json_schema,
+        client,
+        reasoning_effort,
+    )
 
     if structured_output:
         with open(output_file_path, 'w') as summary_file:
@@ -142,6 +155,8 @@ def main():
         organization=os.environ['OPENAI_ORGANIZATION']
     )
 
+    reasoning_effort = config.get('response_settings', 'reasoning_effort_transcript', fallback='').strip()
+
     process_meeting_file(
         input_file_path=args.input_file,
         context_file_path=args.context_file,
@@ -151,7 +166,8 @@ def main():
         model=model,
         response_settings=response_settings,
         json_schema=json_schema,
-        client=client
+        client=client,
+        reasoning_effort=reasoning_effort
     )
 
 if __name__ == "__main__":

@@ -15,10 +15,10 @@ def run_generation_process(transcript_data, transcript_is_file,
                            context_data, context_is_file,
                            agenda_data, agenda_is_file,
                            minutes_style, output_folder, output_format,
-                           status_bar_update_func, include_rationale=False, 
+                           status_bar_update_func, include_rationale=False,
                            include_recommendations=False, completion_callback=None):
     """
-    Runs the transcript2json.py and json2word.py scripts with the provided inputs.
+    Runs the transcript2json.py, json_refine.py, and json2word.py scripts with the provided inputs.
     Handles temporary file creation for pasted text.
     """
     status_bar_update_func("Starting generation...")
@@ -92,7 +92,9 @@ def run_generation_process(transcript_data, transcript_is_file,
         # Intermediate JSON File Path
         safe_meeting_name = "".join(c if c.isalnum() or c in ('_', '-') else '_' for c in meeting_name)
         json_output_file = os.path.join(output_folder, f"{safe_meeting_name}_interim_minutes.json")
+        refined_json_file = os.path.join(output_folder, f"{safe_meeting_name}_refined_minutes.json")
         print(f"Intermediate JSON path: {json_output_file}")
+        print(f"Refined JSON path: {refined_json_file}")
 
         # Step 1: transcript2json.py
         cmd1 = [
@@ -113,7 +115,24 @@ def run_generation_process(transcript_data, transcript_is_file,
         if result1.stderr:
             print("transcript2json errors:", result1.stderr)
 
-        # Step 2: json2word.py
+        # Step 2: json_refine.py
+        cmd2 = [
+            "python", os.path.abspath("scripts/json_refine.py"),
+            "--input_json", os.path.abspath(json_output_file),
+            "--output_json", os.path.abspath(refined_json_file),
+            "--prompt_file", os.path.abspath("scripts/prompt_refine.md"),
+            "--schema_file", os.path.abspath("scripts/minutes_schema.JSON"),
+            "--config_file", os.path.abspath("config.ini"),
+        ]
+
+        status_bar_update_func("Refining JSON minutes for readability...")
+        print(f"Executing: {' '.join(cmd2)}")
+        result2 = subprocess.run(cmd2, capture_output=True, text=True, check=True, encoding='utf-8')
+        print("json_refine output:", result2.stdout)
+        if result2.stderr:
+            print("json_refine errors:", result2.stderr)
+
+        # Step 3: json2word.py
         datestamp = datetime.datetime.now().strftime("%Y%m%d")
         output_prefix = f"{safe_meeting_name}_Minutes_{datestamp}"
         
@@ -125,28 +144,28 @@ def run_generation_process(transcript_data, transcript_is_file,
         }
         output_format_arg = format_mapping.get(output_format.lower(), "docx")
 
-        if not os.path.exists(json_output_file):
-            raise FileNotFoundError(f"Intermediate JSON file was not created: {json_output_file}")
+        if not os.path.exists(refined_json_file):
+            raise FileNotFoundError(f"Refined JSON file was not created: {refined_json_file}")
 
-        cmd2 = [
+        cmd3 = [
             "python", os.path.abspath("scripts/json2word.py"),
-            "--input_json", os.path.abspath(json_output_file),
+            "--input_json", os.path.abspath(refined_json_file),
             "--output_dir", os.path.abspath(output_folder),
             "--output_prefix", output_prefix,
             "--output_format", output_format_arg,
         ]
         
         if include_rationale:
-            cmd2.append("--include_rationale")
+            cmd3.append("--include_rationale")
         if include_recommendations:
-            cmd2.append("--include_recommendations")
+            cmd3.append("--include_recommendations")
             
         status_bar_update_func("Running JSON to Document conversion...")
-        print(f"Executing: {' '.join(cmd2)}")
-        result2 = subprocess.run(cmd2, capture_output=True, text=True, check=True, encoding='utf-8')
-        print("json2word output:", result2.stdout)
-        if result2.stderr:
-            print("json2word errors:", result2.stderr)
+        print(f"Executing: {' '.join(cmd3)}")
+        result3 = subprocess.run(cmd3, capture_output=True, text=True, check=True, encoding='utf-8')
+        print("json2word output:", result3.stdout)
+        if result3.stderr:
+            print("json2word errors:", result3.stderr)
 
         final_status = f"Generation complete! Files in '{output_folder}' with prefix '{output_prefix}'"
         print("--- Generation Finished Successfully ---")

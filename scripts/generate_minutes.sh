@@ -45,9 +45,17 @@ python scripts/transcript2json.py \
     --schema_file scripts/minutes_schema.JSON \
     --config_file config.ini
 
-# Convert JSON minutes into DOCX and Markdown
-python scripts/json2word.py \
+# Refine JSON minutes for readability
+python scripts/json_refine.py \
     --input_json ${datadir}/${topic}/${meeting}_${date}/minutes_${detail_level}.json \
+    --output_json ${datadir}/${topic}/${meeting}_${date}/minutes_${detail_level}_refined.json \
+    --prompt_file scripts/prompt_refine.md \
+    --schema_file scripts/minutes_schema.JSON \
+    --config_file config.ini
+
+# Convert refined JSON minutes into DOCX and Markdown
+python scripts/json2word.py \
+    --input_json ${datadir}/${topic}/${meeting}_${date}/minutes_${detail_level}_refined.json \
     --output_dir ${outdir} \
     --output_prefix ${meeting}_Minutes_${date} \
     --output_format docx \
