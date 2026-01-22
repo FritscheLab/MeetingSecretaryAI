@@ -182,7 +182,8 @@ If `pytest` is missing, install it with `pip install pytest`.
 - **CLI workflow**
   ```bash
   python scripts/transcript2json.py sample.vtt > meeting.json
-  python scripts/json2word.py meeting.json
+  python scripts/json_refine.py --input_json meeting.json --output_json meeting_refined.json
+  python scripts/json2word.py meeting_refined.json
   bash scripts/generate_minutes.sh   # convenience wrapper
   ```
 
