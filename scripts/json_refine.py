@@ -9,7 +9,7 @@ load_dotenv()
 
 
 def load_file_content(file_path):
-    with open(file_path, 'r') as file:
+    with open(file_path, 'r', encoding='utf-8', errors='replace') as file:
         return file.read()
 
 
@@ -87,7 +87,7 @@ def process_minutes_file(input_file_path, output_file_path, prompt_file_path,
                           model, response_settings, json_schema, client, reasoning_effort):
     system_prompt = load_system_prompt(prompt_file_path)
 
-    with open(input_file_path, 'r') as minutes_file:
+    with open(input_file_path, 'r', encoding='utf-8', errors='replace') as minutes_file:
         minutes_payload = json.load(minutes_file)
 
     refined_output = refine_minutes(
@@ -101,7 +101,7 @@ def process_minutes_file(input_file_path, output_file_path, prompt_file_path,
     )
 
     if refined_output:
-        with open(output_file_path, 'w') as summary_file:
+        with open(output_file_path, 'w', encoding='utf-8') as summary_file:
             summary_file.write(json.dumps(refined_output, indent=4))
         print(f"Refined minutes saved to {output_file_path}")
     else:
@@ -144,7 +144,7 @@ def main():
         'presence_penalty': config.getfloat('response_settings', 'presence_penalty'),
     }
 
-    with open(args.schema_file, 'r') as schema_file:
+    with open(args.schema_file, 'r', encoding='utf-8') as schema_file:
         json_schema = json.load(schema_file)
 
     model = os.environ.get('REFINEMENT_MODEL', os.environ['MODEL'])
