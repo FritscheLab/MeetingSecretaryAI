@@ -7,6 +7,7 @@ import tempfile
 import shutil
 import datetime
 import sys
+from pathlib import Path
 from meeting_utils import (
     ZoomMeetingScanner,
     ContextManager,
@@ -19,6 +20,19 @@ from meeting_utils import (
     CONFIG_ENV_VAR,
     set_persisted_config_path,
 )
+
+def _resolve_repo_root(start_path=None):
+    start_dir = Path(start_path or __file__).resolve().parent
+    for candidate in (start_dir, start_dir.parent):
+        if (candidate / "scripts").is_dir():
+            return candidate
+    return None
+
+REPO_ROOT = _resolve_repo_root()
+
+def _repo_path(relative_path):
+    base = REPO_ROOT if REPO_ROOT else Path.cwd()
+    return str(base / relative_path)
 
 # --- Backend Script Runner ---
 def run_generation_process(transcript_data, transcript_is_file,
@@ -95,7 +109,7 @@ def run_generation_process(transcript_data, transcript_is_file,
             "High Detail": "scripts/prompt_high.md",
             "High Detail (In-Person/Unreliable ID)": "scripts/prompt_high_inperson.md"
         }
-        prompt_file = style_map.get(minutes_style, "scripts/prompt_moderate.md")
+        prompt_file = _repo_path(style_map.get(minutes_style, "scripts/prompt_moderate.md"))
         if not os.path.exists(prompt_file):
             raise FileNotFoundError(f"Prompt file not found: {prompt_file}")
         print(f"Using prompt file: {prompt_file}")
@@ -108,13 +122,13 @@ def run_generation_process(transcript_data, transcript_is_file,
         print(f"Refined JSON path: {refined_json_file}")
 
         # Step 1: transcript2json.py
-        config_file_arg = os.path.abspath(config_path) if config_path else os.path.abspath("config.ini")
+        config_file_arg = os.path.abspath(config_path) if config_path else _repo_path("config.ini")
         cmd1 = [
-            "python", os.path.abspath("scripts/transcript2json.py"),
+            "python", _repo_path("scripts/transcript2json.py"),
             "--input_file", os.path.abspath(transcript_input_arg),
             "--output_file", os.path.abspath(json_output_file),
             "--prompt_file", os.path.abspath(prompt_file),
-            "--schema_file", os.path.abspath("scripts/minutes_schema.JSON"),
+            "--schema_file", _repo_path("scripts/minutes_schema.JSON"),
             "--config_file", config_file_arg,
             "--context_file", os.path.abspath(context_input_arg),
             "--agenda_file", os.path.abspath(agenda_input_arg)
@@ -129,11 +143,11 @@ def run_generation_process(transcript_data, transcript_is_file,
 
         # Step 2: json_refine.py
         cmd2 = [
-            "python", os.path.abspath("scripts/json_refine.py"),
+            "python", _repo_path("scripts/json_refine.py"),
             "--input_json", os.path.abspath(json_output_file),
             "--output_json", os.path.abspath(refined_json_file),
-            "--prompt_file", os.path.abspath("scripts/prompt_refine.md"),
-            "--schema_file", os.path.abspath("scripts/minutes_schema.JSON"),
+            "--prompt_file", _repo_path("scripts/prompt_refine.md"),
+            "--schema_file", _repo_path("scripts/minutes_schema.JSON"),
             "--config_file", config_file_arg,
         ]
 
@@ -160,7 +174,7 @@ def run_generation_process(transcript_data, transcript_is_file,
             raise FileNotFoundError(f"Refined JSON file was not created: {refined_json_file}")
 
         cmd3 = [
-            "python", os.path.abspath("scripts/json2word.py"),
+            "python", _repo_path("scripts/json2word.py"),
             "--input_json", os.path.abspath(refined_json_file),
             "--output_dir", os.path.abspath(output_folder),
             "--output_prefix", output_prefix,
@@ -237,6 +251,13 @@ class MeetingSecretaryApp(tk.Tk):
         super().__init__()
         self.title("Meeting Secretary AI")
         self.geometry("900x750")
+
+        if REPO_ROOT is None:
+            messagebox.showwarning(
+                "Repository Not Found",
+                "Could not locate the 'scripts' folder relative to this app.\n"
+                "Please run the app from inside the MeetingSecretaryAI repository."
+            )
 
         self.config_path = resolve_config_path()
         self._config_requires_restart = False
@@ -1033,7 +1054,8 @@ You can still use the app with other input methods (transcript files, audio file
                 return
             
             # Check if script files exist
-            if not os.path.exists("scripts/transcript2json.py") or not os.path.exists("scripts/json2word.py"):
+            if (not os.path.exists(_repo_path("scripts/transcript2json.py")) or
+                not os.path.exists(_repo_path("scripts/json2word.py"))):
                 messagebox.showerror("Setup Error", "Core script files not found in 'scripts' directory.")
                 return
             
@@ -1150,8 +1172,9 @@ You can still use the app with other input methods (transcript files, audio file
 # --- Run the App ---
 if __name__ == "__main__":
     # Basic checks
-    if not os.path.isdir("scripts"):
-        print("ERROR: 'scripts' directory not found. Please run from repository root.")
+    if REPO_ROOT is None or not os.path.isdir(_repo_path("scripts")):
+        print(f"ERROR: 'scripts' directory not found. Current working dir: {os.getcwd()}")
+        print("Please run this from the MeetingSecretaryAI repository root.")
         exit(1)
     
     config_path = resolve_config_path()
