@@ -7,14 +7,25 @@ import tempfile
 import shutil
 import datetime
 import sys
-from meeting_utils import ZoomMeetingScanner, ContextManager, TokenManager, AudioProcessor, round_time_to_15_min
+from meeting_utils import (
+    ZoomMeetingScanner,
+    ContextManager,
+    TokenManager,
+    AudioProcessor,
+    round_time_to_15_min,
+    get_app_paths,
+    resolve_config_path,
+    load_app_config,
+    CONFIG_ENV_VAR,
+    set_persisted_config_path,
+)
 
 # --- Backend Script Runner ---
 def run_generation_process(transcript_data, transcript_is_file,
                            meeting_name, meeting_time,
                            context_data, context_is_file,
                            agenda_data, agenda_is_file,
-                           minutes_style, output_folder, output_format,
+                           minutes_style, output_folder, output_format, config_path,
                            status_bar_update_func, include_rationale=False,
                            include_recommendations=False, completion_callback=None):
     """
@@ -97,13 +108,14 @@ def run_generation_process(transcript_data, transcript_is_file,
         print(f"Refined JSON path: {refined_json_file}")
 
         # Step 1: transcript2json.py
+        config_file_arg = os.path.abspath(config_path) if config_path else os.path.abspath("config.ini")
         cmd1 = [
             "python", os.path.abspath("scripts/transcript2json.py"),
             "--input_file", os.path.abspath(transcript_input_arg),
             "--output_file", os.path.abspath(json_output_file),
             "--prompt_file", os.path.abspath(prompt_file),
             "--schema_file", os.path.abspath("scripts/minutes_schema.JSON"),
-            "--config_file", os.path.abspath("config.ini"),
+            "--config_file", config_file_arg,
             "--context_file", os.path.abspath(context_input_arg),
             "--agenda_file", os.path.abspath(agenda_input_arg)
         ]
@@ -122,7 +134,7 @@ def run_generation_process(transcript_data, transcript_is_file,
             "--output_json", os.path.abspath(refined_json_file),
             "--prompt_file", os.path.abspath("scripts/prompt_refine.md"),
             "--schema_file", os.path.abspath("scripts/minutes_schema.JSON"),
-            "--config_file", os.path.abspath("config.ini"),
+            "--config_file", config_file_arg,
         ]
 
         status_bar_update_func("Refining JSON minutes for readability...")
@@ -226,10 +238,16 @@ class MeetingSecretaryApp(tk.Tk):
         self.title("Meeting Secretary AI")
         self.geometry("900x750")
 
+        self.config_path = resolve_config_path()
+        self._config_requires_restart = False
+        self.config_path_label_text = tk.StringVar(value=f"Active config: {self.config_path}")
+        self.app_config, _ = load_app_config(self.config_path)
+        self.app_paths = get_app_paths(self.config_path)
+
         # Initialize utilities
-        self.zoom_scanner = ZoomMeetingScanner()
-        self.context_manager = ContextManager()
-        self.token_manager = TokenManager()
+        self.zoom_scanner = ZoomMeetingScanner(zoom_dir=self.app_paths.get("zoom_dir"))
+        self.context_manager = ContextManager(context_dir=self.app_paths.get("context_dir"))
+        self.token_manager = TokenManager(token_file=self.app_paths.get("token_file"))
         self.audio_processor = AudioProcessor(self.token_manager)
 
         # Store loaded meetings and selected meeting to avoid re-fetching
@@ -237,7 +255,10 @@ class MeetingSecretaryApp(tk.Tk):
         self.selected_meeting_data = None
 
         # Variables
-        self.input_mode = tk.StringVar(value="zoom")
+        input_mode_default = self.app_config.get("gui", "input_mode", fallback="zoom").strip().lower()
+        if input_mode_default not in ("zoom", "audio", "transcript", "folder"):
+            input_mode_default = "zoom"
+        self.input_mode = tk.StringVar(value=input_mode_default)
         self.transcript_source = tk.StringVar(value="paste")
         self.transcript_file_path = tk.StringVar()
         self.audio_file_path = tk.StringVar()
@@ -252,19 +273,42 @@ class MeetingSecretaryApp(tk.Tk):
         self.context_source = tk.StringVar(value="select")
         self.context_file_path = tk.StringVar()
         self.selected_context = tk.StringVar()
+        self.default_context_dir = self.app_paths.get("context_dir")
 
         self.agenda_source = tk.StringVar(value="paste")
         self.agenda_file_path = tk.StringVar()
 
         self.minutes_style_options = ["Concise", "Action-Focused", "Moderate", "High Detail", "High Detail (In-Person/Unreliable ID)"]
-        self.minutes_style = tk.StringVar(value="Moderate")  # Default to moderate detail
+        minutes_style_default = self.app_config.get("gui", "minutes_style", fallback="Moderate").strip()
+        if minutes_style_default not in self.minutes_style_options:
+            minutes_style_default = "Moderate"
+        self.minutes_style = tk.StringVar(value=minutes_style_default)
 
-        self.output_folder = tk.StringVar(value=os.path.abspath("../MeetingSecretaryAI_Data/output"))
+        default_output_dir = self.app_paths.get("output_dir") or os.path.abspath("../MeetingSecretaryAI_Data/output")
+        self.output_folder = tk.StringVar(value=default_output_dir)
         self.output_format_options = ["Both", "DOCX", "Markdown"]
-        self.output_format = tk.StringVar(value="DOCX")  # Default to DOCX
+        output_format_default = self.app_config.get("gui", "output_format", fallback="DOCX").strip().lower()
+        if output_format_default in ("both", "all"):
+            output_format_default = "Both"
+        elif output_format_default in ("markdown", "md"):
+            output_format_default = "Markdown"
+        else:
+            output_format_default = "DOCX"
+        self.output_format = tk.StringVar(value=output_format_default)
 
-        self.include_rationale = tk.BooleanVar(value=False)
-        self.include_recommendations = tk.BooleanVar(value=False)
+        include_rationale_default = False
+        include_recommendations_default = False
+        try:
+            include_rationale_default = self.app_config.getboolean("gui", "include_rationale", fallback=False)
+        except ValueError:
+            include_rationale_default = False
+        try:
+            include_recommendations_default = self.app_config.getboolean("gui", "include_recommendations", fallback=False)
+        except ValueError:
+            include_recommendations_default = False
+
+        self.include_rationale = tk.BooleanVar(value=include_rationale_default)
+        self.include_recommendations = tk.BooleanVar(value=include_recommendations_default)
 
         self.status_text = tk.StringVar(value="Ready")
         self.hf_token = tk.StringVar()
@@ -460,6 +504,19 @@ class MeetingSecretaryApp(tk.Tk):
         self._toggle_agenda_input()
 
     def _create_settings_tab(self, parent):
+        # Configuration
+        config_frame = ttk.LabelFrame(parent, text="Configuration", padding="10")
+        config_frame.pack(fill=tk.X, pady=5)
+        config_row = ttk.Frame(config_frame)
+        config_row.pack(fill=tk.X)
+        ttk.Label(
+            config_row,
+            textvariable=self.config_path_label_text,
+            wraplength=620
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        ttk.Button(config_row, text="Copy Path", command=self._copy_config_path).pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Button(config_row, text="Select Config", command=self._select_config_file).pack(side=tk.RIGHT)
+
         # Minutes Style
         style_frame = ttk.LabelFrame(parent, text="Minutes Style", padding="10")
         style_frame.pack(fill=tk.X, pady=5)
@@ -498,6 +555,35 @@ class MeetingSecretaryApp(tk.Tk):
         token_entry_frame.pack(fill=tk.X)
         ttk.Entry(token_entry_frame, textvariable=self.hf_token, width=50, show="*").pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
         ttk.Button(token_entry_frame, text="Save Token", command=self._save_token).pack(side=tk.RIGHT)
+
+    def _copy_config_path(self):
+        """Copy the active config path to the clipboard."""
+        try:
+            self.clipboard_clear()
+            self.clipboard_append(str(self.config_path))
+            self.update_idletasks()
+            self._update_status("Config path copied to clipboard")
+        except Exception as exc:
+            messagebox.showerror("Error", f"Failed to copy config path: {exc}")
+
+    def _select_config_file(self):
+        """Select a config file and prompt for restart."""
+        filepath = filedialog.askopenfilename(
+            title="Select Config File",
+            filetypes=[("INI files", "*.ini"), ("All files", "*.*")]
+        )
+        if not filepath:
+            return
+
+        self.config_path = os.path.abspath(filepath)
+        os.environ[CONFIG_ENV_VAR] = self.config_path
+        set_persisted_config_path(self.config_path)
+        self._config_requires_restart = True
+        self.config_path_label_text.set(f"Config selected (restart to apply): {self.config_path}")
+        messagebox.showinfo(
+            "Restart Required",
+            "Config file selected. Please restart the application to apply new settings."
+        )
 
     def _toggle_input_mode(self):
         """Toggle visibility of input frames based on selected mode."""
@@ -744,7 +830,7 @@ You can still use the app with other input methods (transcript files, audio file
         """Browse for transcript file."""
         filepath = filedialog.askopenfilename(
             title="Select Transcript File",
-            filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
+            filetypes=[("Transcript files", "*.vtt *.txt"), ("All files", "*.*")]
         )
         if filepath:
             self.transcript_file_path.set(os.path.abspath(filepath))
@@ -757,12 +843,16 @@ You can still use the app with other input methods (transcript files, audio file
 
     def _browse_context_file(self):
         """Browse for context file."""
+        initial_dir = self.default_context_dir if self.default_context_dir and os.path.isdir(self.default_context_dir) else None
         filepath = filedialog.askopenfilename(
             title="Select Context File",
-            filetypes=[("Markdown files", "*.md"), ("Text files", "*.txt"), ("All files", "*.*")]
+            initialdir=initial_dir,
+            filetypes=[("Context files", "*.md *.txt"), ("All files", "*.*")]
         )
         if filepath:
             self.context_file_path.set(os.path.abspath(filepath))
+            self.context_source.set("file")
+            self._toggle_context_input()
 
     def _browse_agenda_file(self):
         """Browse for agenda file."""
@@ -863,7 +953,9 @@ You can still use the app with other input methods (transcript files, audio file
                 raise ValueError("Please select a valid input folder")
             
             # Look for transcript file in folder
-            transcript_files = [f for f in os.listdir(folder_path) if f.endswith('.txt')]
+            vtt_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith('.vtt')])
+            txt_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith('.txt')])
+            transcript_files = vtt_files + txt_files
             if not transcript_files:
                 raise ValueError("No transcript files found in selected folder")
             
@@ -956,6 +1048,7 @@ You can still use the app with other input methods (transcript files, audio file
                 self.minutes_style.get(),
                 output_folder_val,
                 self.output_format.get(),
+                self.config_path,
                 self._update_status,
                 self.include_rationale.get(),
                 self.include_recommendations.get(),
@@ -1061,8 +1154,9 @@ if __name__ == "__main__":
         print("ERROR: 'scripts' directory not found. Please run from repository root.")
         exit(1)
     
-    if not os.path.exists("config.ini"):
-        print("WARNING: 'config.ini' not found. Defaults might be used.")
+    config_path = resolve_config_path()
+    if not os.path.exists(config_path):
+        print(f"WARNING: config file not found at {config_path}. Defaults might be used.")
     
     app = MeetingSecretaryApp()
     app.mainloop()

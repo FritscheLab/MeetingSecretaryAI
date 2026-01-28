@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def load_file_content(file_path):
-    with open(file_path, 'r') as file:
+    with open(file_path, 'r', encoding='utf-8', errors='replace') as file:
         return file.read()
 
 def load_system_prompt(prompt_file_path, context, agenda):
@@ -104,7 +104,7 @@ def process_meeting_file(input_file_path, context_file_path, agenda_file_path, p
     )
 
     if structured_output:
-        with open(output_file_path, 'w') as summary_file:
+        with open(output_file_path, 'w', encoding='utf-8') as summary_file:
             summary_file.write(json.dumps(structured_output, indent=4))
         print(f"Structured output saved to {output_file_path}")
     else:

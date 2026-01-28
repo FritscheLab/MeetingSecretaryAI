@@ -174,6 +174,12 @@ The system includes built-in WhisperX support for high-quality transcription:
 3. **Process Audio**: Click "Process Audio" button
 4. **Generate Minutes**: Transcript automatically loads
 
+**Large files:** Audio files larger than ~500 MB are automatically downsampled to 16 kHz mono FLAC before transcription to reduce memory pressure. You can disable or tune this with environment variables:
+- `WHISPERX_TRANSCODE=0` to disable
+- `WHISPERX_TRANSCODE_MB=700` to change the size threshold
+- `WHISPERX_TRANSCODE_FORMAT=flac` (or `wav`)
+- `WHISPERX_TRANSCODE_RATE=16000`
+
 ### Supported Audio Formats
 - `.m4a` (Zoom recordings)
 - `.mp3`
@@ -220,6 +226,42 @@ presence_penalty = 0.0
 reasoning_effort_transcript = low
 reasoning_effort_refine = medium
 ```
+
+### Paths & Defaults (`config.ini`)
+```ini
+[paths]
+data_dir = ../MeetingSecretaryAI_Data
+zoom_dir = ~/Documents/Zoom
+context_dir = ../MeetingSecretaryAI_Data/context
+output_dir = ../MeetingSecretaryAI_Data/output
+token_file = ../MeetingSecretaryAI_Data/.hf_token.txt
+```
+
+### GUI Defaults (`config.ini`)
+```ini
+[gui]
+minutes_style = Moderate
+output_format = DOCX
+input_mode = zoom
+include_rationale = false
+include_recommendations = false
+```
+
+To use an alternate config file (e.g., a Windows-specific config), set:
+```bash
+export MEETING_SECRETARY_CONFIG=path/to/config.ini
+```
+
+In the GUI, you can also pick a config file in the Settings tab. The app will prompt you to restart so the new settings take effect.
+The last selected config path is persisted in `~/.meeting_secretary_config` and reused on launch unless `MEETING_SECRETARY_CONFIG` is set.
+
+### Windows Setup (Quick)
+1. Copy `newfeatures/config.ini` to the repo root as `config.ini`, or keep it in place and set:
+   ```powershell
+   $env:MEETING_SECRETARY_CONFIG="C:\path\to\MeetingSecretaryAI\newfeatures\config.ini"
+   ```
+2. Edit the `[paths]` section to match your local folders if needed.
+3. Launch the GUI as usual.
 
 ---
 

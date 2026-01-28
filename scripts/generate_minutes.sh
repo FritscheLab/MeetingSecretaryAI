@@ -13,6 +13,7 @@ fi
 datadir="../MeetingSecretaryAI_Data/data/"
 outdir="../MeetingSecretaryAI_Data/output/"
 zoomdir="~/Documents/Zoom"
+config_file="${MEETING_SECRETARY_CONFIG:-config.ini}"
 
 # Define meeting parameters
 topic="Study_Section"
@@ -43,7 +44,7 @@ python scripts/transcript2json.py \
     --output_file ${datadir}/${topic}/${meeting}_${date}/minutes_${detail_level}.json \
     --prompt_file scripts/prompt_${detail_level}.md \
     --schema_file scripts/minutes_schema.JSON \
-    --config_file config.ini
+    --config_file ${config_file}
 
 # Refine JSON minutes for readability
 python scripts/json_refine.py \
@@ -51,7 +52,7 @@ python scripts/json_refine.py \
     --output_json ${datadir}/${topic}/${meeting}_${date}/minutes_${detail_level}_refined.json \
     --prompt_file scripts/prompt_refine.md \
     --schema_file scripts/minutes_schema.JSON \
-    --config_file config.ini
+    --config_file ${config_file}
 
 # Convert refined JSON minutes into DOCX and Markdown
 python scripts/json2word.py \
