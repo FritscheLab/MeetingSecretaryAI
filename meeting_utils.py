@@ -1,10 +1,120 @@
 import os
 import re
 import glob
+import configparser
 from datetime import datetime, timedelta
 from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
+
+CONFIG_ENV_VAR = "MEETING_SECRETARY_CONFIG"
+DEFAULT_CONFIG_NAME = "config.ini"
+_WINDOWS_ABS_RE = re.compile(r"^[A-Za-z]:[\\/]")
+CONFIG_PERSIST_FILE = Path.home() / ".meeting_secretary_config"
+
+
+def resolve_config_path(config_path=None):
+    """Resolve the config path, honoring MEETING_SECRETARY_CONFIG if set."""
+    env_path = os.environ.get(CONFIG_ENV_VAR)
+    if env_path:
+        return Path(env_path).expanduser()
+    if config_path:
+        return Path(config_path).expanduser()
+    persisted = get_persisted_config_path()
+    if persisted:
+        return persisted
+    return Path(__file__).resolve().parent / DEFAULT_CONFIG_NAME
+
+
+def get_persisted_config_path():
+    """Return a persisted config path if available."""
+    try:
+        if CONFIG_PERSIST_FILE.exists():
+            value = CONFIG_PERSIST_FILE.read_text(encoding="utf-8").strip()
+            if value:
+                return Path(value).expanduser()
+    except Exception:
+        return None
+    return None
+
+
+def set_persisted_config_path(config_path):
+    """Persist the config path for future launches."""
+    try:
+        CONFIG_PERSIST_FILE.parent.mkdir(parents=True, exist_ok=True)
+        CONFIG_PERSIST_FILE.write_text(f"{config_path}\n", encoding="utf-8")
+        return True
+    except Exception as exc:
+        print(f"Warning: failed to persist config path: {exc}")
+        return False
+
+
+def _config_get(config, section, option, fallback=None):
+    try:
+        value = config.get(section, option, fallback=fallback)
+    except (configparser.Error, KeyError, ValueError):
+        return fallback
+    if value is None:
+        return fallback
+    value = str(value).strip()
+    return value if value else fallback
+
+
+def _is_windows_abs(path_value):
+    return bool(_WINDOWS_ABS_RE.match(path_value)) or path_value.startswith("\\\\")
+
+
+def _resolve_path(value, base_dir):
+    if not value:
+        return None
+    expanded = os.path.expandvars(os.path.expanduser(value))
+    if os.path.isabs(expanded) or _is_windows_abs(expanded):
+        return expanded
+    return os.path.abspath(os.path.join(base_dir, expanded))
+
+
+def load_app_config(config_path=None):
+    """Load config.ini (or override) and return (config, config_path)."""
+    config_path = resolve_config_path(config_path)
+    config = configparser.ConfigParser(interpolation=None)
+    config.read(config_path)
+    return config, config_path
+
+
+def get_app_paths(config_path=None):
+    """Resolve commonly used paths from config with sensible defaults."""
+    config, config_path = load_app_config(config_path)
+    base_dir = str(config_path.parent)
+
+    data_dir = _resolve_path(
+        _config_get(config, "paths", "data_dir", "../MeetingSecretaryAI_Data"),
+        base_dir,
+    )
+    zoom_dir = _resolve_path(
+        _config_get(config, "paths", "zoom_dir", "~/Documents/Zoom"),
+        base_dir,
+    )
+    context_dir = _resolve_path(
+        _config_get(config, "paths", "context_dir", os.path.join(data_dir, "context")),
+        base_dir,
+    )
+    output_dir = _resolve_path(
+        _config_get(config, "paths", "output_dir", os.path.join(data_dir, "output")),
+        base_dir,
+    )
+    token_file = _resolve_path(
+        _config_get(config, "paths", "token_file", os.path.join(data_dir, ".hf_token.txt")),
+        base_dir,
+    )
+
+    return {
+        "config_path": str(config_path),
+        "data_dir": data_dir,
+        "zoom_dir": zoom_dir,
+        "context_dir": context_dir,
+        "output_dir": output_dir,
+        "token_file": token_file,
+    }
 
 def round_time_to_15_min(time_obj):
     """Round time down to the closest 15-minute mark."""
@@ -15,8 +125,12 @@ def round_time_to_15_min(time_obj):
 class ZoomMeetingScanner:
     """Utility class for scanning Zoom meetings and extracting information."""
     
-    def __init__(self, zoom_dir="~/Documents/Zoom"):
-        self.zoom_dir = os.path.expanduser(zoom_dir)
+    def __init__(self, zoom_dir=None, config_path=None):
+        if zoom_dir is None:
+            zoom_dir = get_app_paths(config_path).get("zoom_dir")
+        self.zoom_dir = os.path.expanduser(zoom_dir) if zoom_dir else ""
+        if self.zoom_dir and not os.path.exists(self.zoom_dir):
+            print(f"Warning: Zoom directory not found at {self.zoom_dir}")
         
     def get_latest_meetings(self, limit=5):
         """Get the latest Zoom meetings sorted by date.
@@ -34,10 +148,12 @@ class ZoomMeetingScanner:
             for item in os.listdir(self.zoom_dir):
                 item_path = os.path.join(self.zoom_dir, item)
                 if os.path.isdir(item_path):
-                    # Check if it contains meeting_saved_closed_caption.txt
-                    caption_file = os.path.join(item_path, "meeting_saved_closed_caption.txt")
-                    if os.path.exists(caption_file):
-                        meeting_info = self._extract_meeting_info(item, item_path)
+                    vtt_files = sorted(glob.glob(os.path.join(item_path, "*.vtt")))
+                    txt_files = sorted(glob.glob(os.path.join(item_path, "meeting_saved_closed_caption.txt")))
+                    transcript_candidates = vtt_files + txt_files
+                    if transcript_candidates:
+                        transcript_file = transcript_candidates[0]
+                        meeting_info = self._extract_meeting_info(item, item_path, transcript_file)
                         if meeting_info:
                             meetings.append(meeting_info)
         except PermissionError as e:
@@ -58,7 +174,7 @@ class ZoomMeetingScanner:
         meetings.sort(key=lambda x: x['datetime'], reverse=True)
         return meetings[:limit] if limit is not None else meetings
     
-    def _extract_meeting_info(self, folder_name, folder_path):
+    def _extract_meeting_info(self, folder_name, folder_path, transcript_file):
         """Extract meeting information from folder name and contents."""
         # Parse folder name: "2025-03-27 10.14.08 COMPASS PI Meeting"
         match = re.match(r'(\d{4}-\d{2}-\d{2}) (\d{2}\.\d{2}\.\d{2}) (.+)', folder_name)
@@ -77,10 +193,8 @@ class ZoomMeetingScanner:
         except ValueError:
             return None
             
-        caption_file = os.path.join(folder_path, "meeting_saved_closed_caption.txt")
-        
         # Extract participants from transcript
-        participants = self._extract_participants(caption_file)
+        participants = self._extract_participants(transcript_file)
         
         return {
             'folder_name': folder_name,
@@ -90,7 +204,7 @@ class ZoomMeetingScanner:
             'time': datetime_obj.strftime("%H:%M:%S"),  # Use rounded time
             'datetime': datetime_obj,
             'participants': participants,
-            'transcript_file': caption_file
+            'transcript_file': transcript_file
         }
     
     def _extract_participants(self, caption_file):
@@ -98,7 +212,7 @@ class ZoomMeetingScanner:
         participants = set()
         
         try:
-            with open(caption_file, 'r', encoding='utf-8') as file:
+            with open(caption_file, 'r', encoding='utf-8', errors='replace') as file:
                 content = file.read()
                 
             # Look for speaker patterns like "[Speaker Name] timestamp"
@@ -162,12 +276,12 @@ Attendees: {', '.join(participants)}
 
 ## Agenda
 
-No agenda items were submitted for this meeting. Please derive from the transcript.
+No agenda items were submitted for this meeting. Please derive agenda items and action items from the transcript.
 
 ## Next meeting
 Next meeting: {meeting_name}
-Scheduled: TBD
-Location: TBD
+Scheduled: Derive from transcript otherwise TBD
+Location: Derive from transcript otherwise TBD
 """
         
         return agenda_content
@@ -176,8 +290,10 @@ Location: TBD
 class ContextManager:
     """Manages context files for different meeting types."""
     
-    def __init__(self, context_dir="../MeetingSecretaryAI_Data/context/"):
-        self.context_dir = os.path.expanduser(context_dir)
+    def __init__(self, context_dir=None, config_path=None):
+        if context_dir is None:
+            context_dir = get_app_paths(config_path).get("context_dir")
+        self.context_dir = os.path.expanduser(context_dir) if context_dir else ""
         
     def get_available_contexts(self):
         """Get list of available context files."""
@@ -210,8 +326,10 @@ class ContextManager:
 class TokenManager:
     """Manages HuggingFace token for WhisperX."""
     
-    def __init__(self, token_file="../MeetingSecretaryAI_Data/.hf_token.txt"):
-        self.token_file = os.path.expanduser(token_file)
+    def __init__(self, token_file=None, config_path=None):
+        if token_file is None:
+            token_file = get_app_paths(config_path).get("token_file")
+        self.token_file = os.path.expanduser(token_file) if token_file else ""
         
     def get_token(self):
         """Get the HuggingFace token."""
@@ -248,6 +366,79 @@ class AudioProcessor:
             return int(value)
         except Exception:
             return default
+
+    @staticmethod
+    def _coerce_bool(value, default):
+        if value is None:
+            return default
+        return str(value).strip().lower() not in ("0", "false", "no", "off")
+
+    @staticmethod
+    def _maybe_transcode_audio(audio_file, output_dir):
+        """Downsample large audio files to 16kHz mono to reduce size and memory pressure."""
+        import os
+        import shutil
+        import subprocess
+        from pathlib import Path
+
+        if not AudioProcessor._coerce_bool(os.environ.get("WHISPERX_TRANSCODE"), True):
+            return audio_file
+
+        try:
+            size_mb = os.path.getsize(audio_file) / (1024 * 1024)
+        except OSError:
+            return audio_file
+
+        try:
+            threshold_mb = float(os.environ.get("WHISPERX_TRANSCODE_MB", "500"))
+        except ValueError:
+            threshold_mb = 500.0
+        if size_mb < threshold_mb:
+            return audio_file
+
+        ffmpeg_path = shutil.which("ffmpeg")
+        if not ffmpeg_path:
+            print("ffmpeg not found; skipping audio transcode.")
+            return audio_file
+
+        target_rate = os.environ.get("WHISPERX_TRANSCODE_RATE", "16000")
+        target_format = os.environ.get("WHISPERX_TRANSCODE_FORMAT", "flac").lower()
+        if target_format not in ("flac", "wav"):
+            target_format = "flac"
+
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / f"{Path(audio_file).stem}.whisperx_16k.{target_format}"
+
+        try:
+            if output_path.exists() and output_path.stat().st_size > 0:
+                return str(output_path)
+        except OSError:
+            pass
+
+        cmd = [
+            ffmpeg_path,
+            "-y",
+            "-loglevel",
+            "error",
+            "-i",
+            audio_file,
+            "-ac",
+            "1",
+            "-ar",
+            str(target_rate),
+            "-sample_fmt",
+            "s16",
+            "-vn",
+            str(output_path),
+        ]
+
+        try:
+            subprocess.run(cmd, capture_output=True, text=True, check=True)
+            return str(output_path)
+        except subprocess.CalledProcessError as e:
+            print(f"ffmpeg transcode failed; using original audio. {e.stderr}")
+            return audio_file
 
     @staticmethod
     def _auto_whisperx_settings():
@@ -344,6 +535,8 @@ class AudioProcessor:
             
         # Ensure output directory exists
         os.makedirs(output_dir, exist_ok=True)
+
+        audio_file = self._maybe_transcode_audio(audio_file, output_dir)
         
         # WhisperX command - try to find the correct whisperx executable
         import shutil
