@@ -1,6 +1,7 @@
 # Environment and API keys
 .env
 *.env
+config.ini
 
 # Data directories
 data/

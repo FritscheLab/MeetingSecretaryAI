@@ -227,6 +227,11 @@ reasoning_effort_transcript = low
 reasoning_effort_refine = medium
 ```
 
+`config.ini` is gitignored. Start by copying the example:
+```bash
+cp config.example.ini config.ini
+```
+
 ### Paths & Defaults (`config.ini`)
 ```ini
 [paths]

@@ -2,6 +2,7 @@ import os
 import re
 import glob
 import configparser
+import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 import tkinter as tk
@@ -11,19 +12,38 @@ CONFIG_ENV_VAR = "MEETING_SECRETARY_CONFIG"
 DEFAULT_CONFIG_NAME = "config.ini"
 _WINDOWS_ABS_RE = re.compile(r"^[A-Za-z]:[\\/]")
 CONFIG_PERSIST_FILE = Path.home() / ".meeting_secretary_config"
+DEFAULT_CONFIG_EXAMPLE_NAME = "config.example.ini"
 
 
 def resolve_config_path(config_path=None):
     """Resolve the config path, honoring MEETING_SECRETARY_CONFIG if set."""
     env_path = os.environ.get(CONFIG_ENV_VAR)
     if env_path:
-        return Path(env_path).expanduser()
+        candidate = Path(env_path).expanduser()
+        if candidate.exists():
+            return candidate
     if config_path:
-        return Path(config_path).expanduser()
+        candidate = Path(config_path).expanduser()
+        if candidate.exists():
+            return candidate
     persisted = get_persisted_config_path()
-    if persisted:
+    if persisted and persisted.exists():
         return persisted
-    return Path(__file__).resolve().parent / DEFAULT_CONFIG_NAME
+    repo_dir = Path(__file__).resolve().parent
+    default_path = repo_dir / DEFAULT_CONFIG_NAME
+    if default_path.exists():
+        return default_path
+    example_path = repo_dir / DEFAULT_CONFIG_EXAMPLE_NAME
+    if example_path.exists():
+        try:
+            shutil.copyfile(example_path, default_path)
+            print(f"Created default config at {default_path} from {example_path}")
+            return default_path
+        except Exception as exc:
+            print(f"Warning: failed to create config.ini from example: {exc}")
+    if example_path.exists():
+        return example_path
+    return default_path
 
 
 def get_persisted_config_path():

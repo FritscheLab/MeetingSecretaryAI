@@ -2,6 +2,8 @@ import argparse
 import os
 import configparser
 import json
+import shutil
+from pathlib import Path
 from datetime import date
 from openai import AzureOpenAI
 from dotenv import load_dotenv
@@ -125,9 +127,22 @@ def main():
     
     args = parser.parse_args()
 
+    config_path = Path(args.config_file).expanduser()
+    if not config_path.exists():
+        example_path = Path(__file__).resolve().parents[1] / "config.example.ini"
+        if config_path.name == "config.ini" and example_path.exists():
+            try:
+                shutil.copyfile(example_path, config_path)
+                print(f"Created default config at {config_path} from {example_path}")
+            except Exception as exc:
+                print(f"Warning: failed to create config.ini from example: {exc}")
+        if not config_path.exists() and example_path.exists():
+            print(f"Config not found at {config_path}; using {example_path}.")
+            config_path = example_path
+
     # Load configuration from the specified config file
     config = configparser.ConfigParser()
-    config.read(args.config_file)
+    config.read(str(config_path))
 
     # Extract response settings from the config file
     response_settings = {

@@ -14,6 +14,10 @@ datadir="../MeetingSecretaryAI_Data/data/"
 outdir="../MeetingSecretaryAI_Data/output/"
 zoomdir="~/Documents/Zoom"
 config_file="${MEETING_SECRETARY_CONFIG:-config.ini}"
+if [ ! -f "${config_file}" ] && [ -f "config.example.ini" ]; then
+    echo "Config not found at ${config_file}; using config.example.ini"
+    config_file="config.example.ini"
+fi
 
 # Define meeting parameters
 topic="Study_Section"
