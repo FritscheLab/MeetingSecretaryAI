@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from datetime import datetime, date
 from docx import Document
 from docx.oxml import OxmlElement
@@ -9,6 +10,19 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_PARAGRAPH_ALIGNMENT
 import argparse
 
 today_str = date.today().strftime("%Y-%m-%d")
+
+# XML 1.0 disallows certain control chars; python-docx will fail if they appear.
+_XML_INVALID_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F]")
+
+def sanitize_for_xml(value):
+    """Recursively strip XML-invalid control characters from all strings."""
+    if isinstance(value, str):
+        return _XML_INVALID_RE.sub("", value)
+    if isinstance(value, list):
+        return [sanitize_for_xml(item) for item in value]
+    if isinstance(value, dict):
+        return {key: sanitize_for_xml(val) for key, val in value.items()}
+    return value
 
 def add_bold_text(paragraph, bold_text, normal_text):
     run = paragraph.add_run(bold_text)
@@ -573,6 +587,7 @@ def create_meeting_minutes_markdown(json_data, include_rationale=False, include_
 def main(input_json, output_dir, output_prefix, output_format, include_rationale, include_recommendations):
     with open(input_json, 'r') as json_file:
         json_data = json.load(json_file)
+    json_data = sanitize_for_xml(json_data)
     
     # Ensure the output directory exists
     os.makedirs(output_dir, exist_ok=True)

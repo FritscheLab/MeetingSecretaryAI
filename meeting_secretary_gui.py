@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, filedialog, scrolledtext, messagebox
+from tkinter import ttk, filedialog, scrolledtext, messagebox, simpledialog
 import threading
 import subprocess
 import os
@@ -7,6 +7,7 @@ import tempfile
 import shutil
 import datetime
 import sys
+import importlib.util
 from pathlib import Path
 from meeting_utils import (
     ZoomMeetingScanner,
@@ -33,6 +34,24 @@ REPO_ROOT = _resolve_repo_root()
 def _repo_path(relative_path):
     base = REPO_ROOT if REPO_ROOT else Path.cwd()
     return str(base / relative_path)
+
+_TRANSCRIPT_TO_ZOOM = None
+
+def _load_transcript_to_zoom():
+    """Dynamically load transcript_to_zoom utilities for VTT speaker labeling."""
+    global _TRANSCRIPT_TO_ZOOM
+    if _TRANSCRIPT_TO_ZOOM is not None:
+        return _TRANSCRIPT_TO_ZOOM
+    module_path = _repo_path("scripts/transcript_to_zoom.py")
+    if not os.path.exists(module_path):
+        return None
+    spec = importlib.util.spec_from_file_location("transcript_to_zoom", module_path)
+    if spec is None or spec.loader is None:
+        return None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    _TRANSCRIPT_TO_ZOOM = module
+    return module
 
 # --- Backend Script Runner ---
 def run_generation_process(transcript_data, transcript_is_file,
@@ -927,7 +946,9 @@ You can still use the app with other input methods (transcript files, audio file
             if success:
                 self._update_status(message)
                 # Look for generated transcript
-                transcript_files = [f for f in os.listdir(output_dir) if f.endswith('.txt')]
+                vtt_files = sorted([f for f in os.listdir(output_dir) if f.lower().endswith('.vtt')])
+                txt_files = sorted([f for f in os.listdir(output_dir) if f.lower().endswith('.txt')])
+                transcript_files = vtt_files + txt_files
                 if transcript_files:
                     transcript_path = os.path.join(output_dir, transcript_files[0])
                     self.transcript_file_path.set(transcript_path)
@@ -985,6 +1006,88 @@ You can still use the app with other input methods (transcript files, audio file
         else:
             raise ValueError("Please select a valid input method")
 
+    def _prompt_for_speaker_names_gui(self, placeholders, examples, max_examples=6):
+        """Prompt for speaker display names with example utterances."""
+        name_mapping = {}
+        if not placeholders:
+            return name_mapping
+
+        for speaker_id in sorted(placeholders):
+            sample_lines = examples.get(speaker_id, [])
+            preview = "\n".join(f"- {line}" for line in sample_lines[:max_examples])
+            if not preview:
+                preview = "(No sample lines found.)"
+
+            while True:
+                prompt = (
+                    f"Examples for {speaker_id}:\n"
+                    f"{preview}\n\n"
+                    f"Enter the display name for {speaker_id}:"
+                )
+                entered = simpledialog.askstring(
+                    "Speaker Labeling",
+                    prompt,
+                    parent=self,
+                )
+                if entered is None:
+                    keep = messagebox.askyesno(
+                        "Keep Placeholder?",
+                        f"Keep '{speaker_id}' as the label?",
+                        parent=self,
+                    )
+                    if keep:
+                        break
+                    continue
+
+                entered = entered.strip()
+                if entered:
+                    name_mapping[speaker_id] = entered
+                    break
+
+                messagebox.showwarning(
+                    "Missing Name",
+                    "Please enter a name or choose to keep the placeholder.",
+                    parent=self,
+                )
+
+        return name_mapping
+
+    def _maybe_label_speakers(self, transcript_data, transcript_is_file):
+        """If transcript is VTT with placeholder speakers, prompt for labels."""
+        if not transcript_is_file:
+            return transcript_data, transcript_is_file
+
+        if not transcript_data.lower().endswith(".vtt"):
+            return transcript_data, transcript_is_file
+
+        module = _load_transcript_to_zoom()
+        if module is None:
+            return transcript_data, transcript_is_file
+
+        try:
+            entries = module.parse_transcript(Path(transcript_data))
+        except Exception as exc:
+            messagebox.showwarning(
+                "Speaker Labeling",
+                f"Could not parse VTT transcript for speaker labeling.\n{exc}",
+                parent=self,
+            )
+            return transcript_data, transcript_is_file
+
+        placeholder_speakers = [
+            entry.speaker_id
+            for entry in entries
+            if module.SPEAKER_PLACEHOLDER_RE.match(entry.speaker_id)
+        ]
+        placeholder_set = sorted(set(placeholder_speakers))
+        if not placeholder_set:
+            return transcript_data, transcript_is_file
+
+        examples = module.collect_examples(entries)
+        name_mapping = self._prompt_for_speaker_names_gui(placeholder_set, examples)
+        labeled_transcript = module.build_zoom_log(entries, name_mapping)
+        return labeled_transcript, False
+
     def _get_context_data(self):
         """Get context data based on current settings."""
         mode = self.context_source.get()
@@ -1035,6 +1138,10 @@ You can still use the app with other input methods (transcript files, audio file
         try:
             # Get transcript data
             transcript_data, transcript_is_file = self._get_transcript_data()
+            transcript_data, transcript_is_file = self._maybe_label_speakers(
+                transcript_data,
+                transcript_is_file,
+            )
             
             # Get context data
             context_data, context_is_file = self._get_context_data()

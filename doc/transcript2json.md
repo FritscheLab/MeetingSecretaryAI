@@ -13,6 +13,8 @@ python scripts/transcript2json.py \
   --context_file <path_to_context> \
   --agenda_file <path_to_agenda> \
   --output_file <output_minutes.json> \
+  [--label_speakers] \
+  [--speaker_examples 7] \
   [--prompt_file scripts/prompt.md] \
   [--schema_file scripts/minutes_schema.JSON] \
   [--config_file config.ini]
@@ -28,6 +30,8 @@ python scripts/transcript2json.py \
 | `--context_file` | Path to the context file (`context.md`).              | ✅       | N/A                         |
 | `--agenda_file`  | Path to the meeting agenda (Markdown).                | ✅       | N/A                         |
 | `--output_file`  | Path to save the output JSON minutes.                 | ✅       | N/A                         |
+| `--label_speakers` | If the input is a VTT with `SPEAKER_XX` placeholders, prompt for labels in the terminal. | ❌ | Off |
+| `--speaker_examples` | Number of sample utterances to show per speaker during labeling. | ❌ | `7` |
 | `--prompt_file`  | Custom system prompt file for the AI model.           | ❌       | `scripts/prompt.md`         |
 | `--schema_file`  | Path to the JSON schema definition.                   | ❌       | `scripts/minutes_schema.JSON`|
 | `--config_file`  | Path to configuration settings for the AI response.   | ❌       | `config.ini`                |

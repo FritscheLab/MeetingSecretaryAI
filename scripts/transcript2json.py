@@ -3,6 +3,7 @@ import os
 import configparser
 import json
 import shutil
+import sys
 from pathlib import Path
 from datetime import date
 from openai import AzureOpenAI
@@ -21,6 +22,61 @@ def load_system_prompt(prompt_file_path, context, agenda):
     """
     prompt_template = load_file_content(prompt_file_path)
     return prompt_template.format(context=context, agenda=agenda)
+
+def maybe_label_vtt_transcript(input_file_path, label_speakers=False, examples_per_speaker=7):
+    """Optionally prompt for speaker labels if the input is a VTT with placeholders."""
+    transcript_content = load_file_content(input_file_path)
+
+    if not label_speakers:
+        return transcript_content
+
+    if not str(input_file_path).lower().endswith(".vtt"):
+        return transcript_content
+
+    if not sys.stdin or not sys.stdin.isatty():
+        print("Warning: --label_speakers requested but no interactive terminal is available. "
+              "Using the original transcript content.")
+        return transcript_content
+
+    try:
+        script_dir = Path(__file__).resolve().parent
+        if str(script_dir) not in sys.path:
+            sys.path.insert(0, str(script_dir))
+        from transcript_to_zoom import (
+            parse_transcript,
+            collect_examples,
+            prompt_for_speaker_names,
+            build_zoom_log,
+            SPEAKER_PLACEHOLDER_RE,
+        )
+    except Exception as exc:
+        print(f"Warning: failed to load speaker labeling utilities ({exc}); using original transcript.")
+        return transcript_content
+
+    try:
+        entries = parse_transcript(Path(input_file_path))
+    except Exception as exc:
+        print(f"Warning: failed to parse VTT transcript ({exc}); using original transcript.")
+        return transcript_content
+
+    if not entries:
+        return transcript_content
+
+    placeholder_speakers = [
+        entry.speaker_id for entry in entries
+        if SPEAKER_PLACEHOLDER_RE.match(entry.speaker_id)
+    ]
+    placeholder_set = sorted(set(placeholder_speakers))
+    if not placeholder_set:
+        return transcript_content
+
+    examples = collect_examples(entries)
+    name_mapping = prompt_for_speaker_names(
+        placeholder_set,
+        examples,
+        batch_size=max(1, int(examples_per_speaker)),
+    )
+    return build_zoom_log(entries, name_mapping)
 
 def generate_summary(system_prompt, transcript_content, model, response_settings, json_schema,
                      client, reasoning_effort):
@@ -86,14 +142,17 @@ def generate_summary(system_prompt, transcript_content, model, response_settings
 
 def process_meeting_file(input_file_path, context_file_path, agenda_file_path, prompt_file_path,
                          output_file_path, model, response_settings, json_schema, client,
-                         reasoning_effort):
+                         reasoning_effort, transcript_content_override=None):
     # Load context, agenda, and system prompt
     context = load_file_content(context_file_path)
     agenda = load_file_content(agenda_file_path)
     system_prompt = load_system_prompt(prompt_file_path, context, agenda)
 
     # Load transcript content
-    transcript_content = load_file_content(input_file_path)
+    if transcript_content_override is None:
+        transcript_content = load_file_content(input_file_path)
+    else:
+        transcript_content = transcript_content_override
 
     structured_output = generate_summary(
         system_prompt,
@@ -124,6 +183,10 @@ def main():
                         help="Path to the JSON schema file (default: scripts/minutes_schema.JSON).")
     parser.add_argument("--config_file", default="config.ini",
                         help="Path to the configuration file (default: config.ini).")
+    parser.add_argument("--label_speakers", action="store_true",
+                        help="If the input is a VTT with SPEAKER_XX placeholders, prompt to label them.")
+    parser.add_argument("--speaker_examples", type=int, default=7,
+                        help="Number of sample utterances to show per speaker when labeling (default: 7).")
     
     args = parser.parse_args()
 
@@ -172,6 +235,12 @@ def main():
 
     reasoning_effort = config.get('response_settings', 'reasoning_effort_transcript', fallback='').strip()
 
+    transcript_content_override = maybe_label_vtt_transcript(
+        args.input_file,
+        label_speakers=args.label_speakers,
+        examples_per_speaker=args.speaker_examples,
+    )
+
     process_meeting_file(
         input_file_path=args.input_file,
         context_file_path=args.context_file,
@@ -182,7 +251,8 @@ def main():
         response_settings=response_settings,
         json_schema=json_schema,
         client=client,
-        reasoning_effort=reasoning_effort
+        reasoning_effort=reasoning_effort,
+        transcript_content_override=transcript_content_override,
     )
 
 if __name__ == "__main__":
