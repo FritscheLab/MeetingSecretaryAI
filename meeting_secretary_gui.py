@@ -948,13 +948,26 @@ You can still use the app with other input methods (transcript files, audio file
                 # Look for generated transcript
                 vtt_files = sorted([f for f in os.listdir(output_dir) if f.lower().endswith('.vtt')])
                 txt_files = sorted([f for f in os.listdir(output_dir) if f.lower().endswith('.txt')])
-                transcript_files = vtt_files + txt_files
+                srt_files = sorted([f for f in os.listdir(output_dir) if f.lower().endswith('.srt')])
+                tsv_files = sorted([f for f in os.listdir(output_dir) if f.lower().endswith('.tsv')])
+                transcript_files = vtt_files + txt_files + srt_files + tsv_files
                 if transcript_files:
                     transcript_path = os.path.join(output_dir, transcript_files[0])
                     self.transcript_file_path.set(transcript_path)
                     self.input_mode.set("transcript")
                     self._toggle_input_mode()
-                    messagebox.showinfo("Success", f"Audio processed successfully!\nTranscript saved to: {transcript_path}")
+                    messagebox.showinfo(
+                        "Success",
+                        f"Audio processed successfully!\nTranscript saved to: {transcript_path}",
+                    )
+                else:
+                    self._update_status("Audio processed but no transcript file found.")
+                    messagebox.showwarning(
+                        "No Transcript Found",
+                        "Audio processing completed, but no transcript file was found in:\n"
+                        f"{output_dir}\n\n"
+                        "Expected one of: .vtt, .txt, .srt, .tsv",
+                    )
             else:
                 self._update_status(f"Audio processing failed: {message}")
                 messagebox.showerror("Error", f"Audio processing failed: {message}")
